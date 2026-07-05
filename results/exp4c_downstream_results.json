@@ -1,0 +1,199 @@
+{
+  "model": "Qwen/Qwen2.5-3B",
+  "n_gsm8k": 50,
+  "n_creative": 30,
+  "results": {
+    "greedy": {
+      "gsm8k_accuracy": 0.0,
+      "creative_agg": {
+        "length": 201.56666666666666,
+        "distinct-1": 0.4872113583215368,
+        "distinct-2": 0.7963884167791604,
+        "distinct-3": 0.8828044945580906,
+        "rep_rate": 0.004788111837854135,
+        "vocab_richness": 0.4872113583215368,
+        "word_count": 173.1,
+        "avg_word_len": 4.549001850958664,
+        "sentence_count": 10.9,
+        "avg_sentence_len": 16.608402014652015,
+        "trigram_repeat": 0.1039870897469188
+      },
+      "gsm8k_sample": [
+        {
+          "question": "If a store has 15 apples and sells 7, how many are left?",
+          "expected": 8,
+          "predicted": 14,
+          "correct": false
+        },
+        {
+          "question": "A train travels 60 miles per hour for 3 hours. How far does it go?",
+          "expected": 180,
+          "predicted": 250,
+          "correct": false
+        },
+        {
+          "question": "There are 24 students in a class. If 1/3 are absent, how many are present?",
+          "expected": 16,
+          "predicted": 25,
+          "correct": false
+        },
+        {
+          "question": "A rectangle has length 12 and width 5. What is its area?",
+          "expected": 60,
+          "predicted": 45,
+          "correct": false
+        },
+        {
+          "question": "If you buy 3 books at $8 each, how much do you spend?",
+          "expected": 24,
+          "predicted": 2,
+          "correct": false
+        }
+      ]
+    },
+    "top_p_0.95": {
+      "gsm8k_accuracy": 0.18,
+      "creative_agg": {
+        "length": 201.56666666666666,
+        "distinct-1": 0.5947472700483041,
+        "distinct-2": 0.9092995716051584,
+        "distinct-3": 0.9699535923450212,
+        "rep_rate": 0.00461811996429492,
+        "vocab_richness": 0.5947472700483041,
+        "word_count": 162.06666666666666,
+        "avg_word_len": 4.857225502499897,
+        "sentence_count": 10.033333333333333,
+        "avg_sentence_len": 17.59883322015675,
+        "trigram_repeat": 0.025228652754941645
+      },
+      "gsm8k_sample": [
+        {
+          "question": "If a store has 15 apples and sells 7, how many are left?",
+          "expected": 8,
+          "predicted": 1,
+          "correct": false
+        },
+        {
+          "question": "A train travels 60 miles per hour for 3 hours. How far does it go?",
+          "expected": 180,
+          "predicted": 25,
+          "correct": false
+        },
+        {
+          "question": "There are 24 students in a class. If 1/3 are absent, how many are present?",
+          "expected": 16,
+          "predicted": 24,
+          "correct": false
+        },
+        {
+          "question": "A rectangle has length 12 and width 5. What is its area?",
+          "expected": 60,
+          "predicted": 60,
+          "correct": true
+        },
+        {
+          "question": "If you buy 3 books at $8 each, how much do you spend?",
+          "expected": 24,
+          "predicted": 2,
+          "correct": false
+        }
+      ]
+    },
+    "top_nsigma_2": {
+      "gsm8k_accuracy": 0.08,
+      "creative_agg": {
+        "length": 201.56666666666666,
+        "distinct-1": 0.5878108573623984,
+        "distinct-2": 0.9136069316624376,
+        "distinct-3": 0.9706316733419543,
+        "rep_rate": 0.004788111837854135,
+        "vocab_richness": 0.5878108573623984,
+        "word_count": 159.76666666666668,
+        "avg_word_len": 4.824548591177363,
+        "sentence_count": 8.866666666666667,
+        "avg_sentence_len": 18.891660746660747,
+        "trigram_repeat": 0.02819276766986142
+      },
+      "gsm8k_sample": [
+        {
+          "question": "If a store has 15 apples and sells 7, how many are left?",
+          "expected": 8,
+          "predicted": 0,
+          "correct": false
+        },
+        {
+          "question": "A train travels 60 miles per hour for 3 hours. How far does it go?",
+          "expected": 180,
+          "predicted": 17,
+          "correct": false
+        },
+        {
+          "question": "There are 24 students in a class. If 1/3 are absent, how many are present?",
+          "expected": 16,
+          "predicted": 250,
+          "correct": false
+        },
+        {
+          "question": "A rectangle has length 12 and width 5. What is its area?",
+          "expected": 60,
+          "predicted": 4,
+          "correct": false
+        },
+        {
+          "question": "If you buy 3 books at $8 each, how much do you spend?",
+          "expected": 24,
+          "predicted": 27,
+          "correct": false
+        }
+      ]
+    },
+    "nu_k10_m3": {
+      "gsm8k_accuracy": 0.14,
+      "creative_agg": {
+        "length": 201.56666666666666,
+        "distinct-1": 0.6230574539082612,
+        "distinct-2": 0.9262668732387874,
+        "distinct-3": 0.9798214635939497,
+        "rep_rate": 0.004453103462644755,
+        "vocab_richness": 0.6230574539082612,
+        "word_count": 158.9,
+        "avg_word_len": 4.894198955073006,
+        "sentence_count": 9.433333333333334,
+        "avg_sentence_len": 21.702727377292597,
+        "trigram_repeat": 0.017303117963042982
+      },
+      "gsm8k_sample": [
+        {
+          "question": "If a store has 15 apples and sells 7, how many are left?",
+          "expected": 8,
+          "predicted": 2,
+          "correct": false
+        },
+        {
+          "question": "A train travels 60 miles per hour for 3 hours. How far does it go?",
+          "expected": 180,
+          "predicted": 8,
+          "correct": false
+        },
+        {
+          "question": "There are 24 students in a class. If 1/3 are absent, how many are present?",
+          "expected": 16,
+          "predicted": 250,
+          "correct": false
+        },
+        {
+          "question": "A rectangle has length 12 and width 5. What is its area?",
+          "expected": 60,
+          "predicted": 184,
+          "correct": false
+        },
+        {
+          "question": "If you buy 3 books at $8 each, how much do you spend?",
+          "expected": 24,
+          "predicted": 4,
+          "correct": false
+        }
+      ]
+    }
+  }
+}
