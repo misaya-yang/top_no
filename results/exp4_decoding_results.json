@@ -1,0 +1,214 @@
+{
+  "model": "Qwen/Qwen2.5-3B",
+  "n_prompts": 50,
+  "max_new_tokens": 200,
+  "temperature": 1.0,
+  "summary": {
+    "greedy": {
+      "factual": {
+        "n": 50,
+        "avg_length": 116.02,
+        "repetition_rate": 0.0,
+        "distinct-1": 0.5723993150684931,
+        "distinct-2": 0.7891398624628063,
+        "distinct-3": 0.8400597524541186,
+        "trigram_repeat_frac": 0.11466106442577029,
+        "unique_token_ratio": 0.5723993150684931
+      },
+      "creative": {
+        "n": 50,
+        "avg_length": 136.64,
+        "repetition_rate": 0.0,
+        "distinct-1": 0.694,
+        "distinct-2": 0.9367839195979899,
+        "distinct-3": 0.6714141414141415,
+        "trigram_repeat_frac": 0.00870015698587127,
+        "unique_token_ratio": 0.694
+      }
+    },
+    "top_p_0.95": {
+      "factual": {
+        "n": 50,
+        "avg_length": 200.0,
+        "repetition_rate": 0.0016080402010050252,
+        "distinct-1": 0.5015999999999999,
+        "distinct-2": 0.805427135678392,
+        "distinct-3": 0.9079797979797981,
+        "trigram_repeat_frac": 0.08564550888718445,
+        "unique_token_ratio": 0.5015999999999999
+      },
+      "creative": {
+        "n": 50,
+        "avg_length": 200.0,
+        "repetition_rate": 0.0,
+        "distinct-1": 0.5806,
+        "distinct-2": 0.8371859296482412,
+        "distinct-3": 0.8804040404040404,
+        "trigram_repeat_frac": 0.023225806451612905,
+        "unique_token_ratio": 0.5806
+      }
+    },
+    "min_p_0.05": {
+      "factual": {
+        "n": 50,
+        "avg_length": 200.0,
+        "repetition_rate": 0.0,
+        "distinct-1": 0.5112000000000001,
+        "distinct-2": 0.8032160804020101,
+        "distinct-3": 0.8893939393939394,
+        "trigram_repeat_frac": 0.11339968003011482,
+        "unique_token_ratio": 0.5112000000000001
+      },
+      "creative": {
+        "n": 50,
+        "avg_length": 200.0,
+        "repetition_rate": 0.0,
+        "distinct-1": 0.5517,
+        "distinct-2": 0.8679396984924622,
+        "distinct-3": 0.9549494949494948,
+        "trigram_repeat_frac": 0.03861803579895686,
+        "unique_token_ratio": 0.5517
+      }
+    },
+    "top_nsigma_2": {
+      "factual": {
+        "n": 50,
+        "avg_length": 200.0,
+        "repetition_rate": 0.0016080402010050252,
+        "distinct-1": 0.6816999999999999,
+        "distinct-2": 0.9681407035175879,
+        "distinct-3": 1.0,
+        "trigram_repeat_frac": 0.0,
+        "unique_token_ratio": 0.6816999999999999
+      },
+      "creative": {
+        "n": 50,
+        "avg_length": 200.0,
+        "repetition_rate": 0.0,
+        "distinct-1": 0.6174000000000001,
+        "distinct-2": 0.9206030150753769,
+        "distinct-3": 0.9745454545454544,
+        "trigram_repeat_frac": 0.0246007326007326,
+        "unique_token_ratio": 0.6174000000000001
+      }
+    },
+    "certified_m5": {
+      "factual": {
+        "n": 50,
+        "avg_length": 200.0,
+        "repetition_rate": 0.0016080402010050252,
+        "distinct-1": 0.6368,
+        "distinct-2": 0.9425125628140704,
+        "distinct-3": 0.9845454545454544,
+        "trigram_repeat_frac": 0.01585576923076923,
+        "unique_token_ratio": 0.6368
+      },
+      "creative": {
+        "n": 50,
+        "avg_length": 200.0,
+        "repetition_rate": 0.0,
+        "distinct-1": 0.6027999999999999,
+        "distinct-2": 0.9022110552763819,
+        "distinct-3": 0.9654545454545453,
+        "trigram_repeat_frac": 0.029710726271241973,
+        "unique_token_ratio": 0.6027999999999999
+      }
+    },
+    "nu_sampling": {
+      "factual": {
+        "n": 50,
+        "avg_length": 200.0,
+        "repetition_rate": 0.010150753768844221,
+        "distinct-1": 0.5945000000000001,
+        "distinct-2": 0.924321608040201,
+        "distinct-3": 0.9896969696969697,
+        "trigram_repeat_frac": 0.01046153846153846,
+        "unique_token_ratio": 0.5945000000000001
+      },
+      "creative": {
+        "n": 50,
+        "avg_length": 200.0,
+        "repetition_rate": 0.0,
+        "distinct-1": 0.5806999999999999,
+        "distinct-2": 0.9022110552763819,
+        "distinct-3": 0.9706060606060606,
+        "trigram_repeat_frac": 0.026178882637352182,
+        "unique_token_ratio": 0.5806999999999999
+      }
+    }
+  },
+  "sample_texts": {
+    "greedy": {
+      "factual": [
+        "ums, and the Notre Dame Cathedral. Paris is also home to many other famous landmarks, including the Arc de Triomphe, the Palace of Versailles, and the Champs-\u00c9lys\u00e9es. The city is a major center for art, culture, fashion, and business. It is also a popular tourist destination, attracting millions of visitors each year.",
+        "face and is the most abundant substance on the planet. It is a polar molecule, which means that it has a positive charge on one end and a negative charge on the other. This makes it a good solvent for many different substances, including salts, sugars, and other organic compounds. Water is also a good conductor of electricity, which is why it is used in batteries and other electrical devices.",
+        " sensory perception, language, and the ability to manipulate the environment. The human brain is capable of learning and adapting throughout life. The brain uses 20% of the body's total energy consumption. The brain is contained within the skull, which protects it from injury. The brain is nourished by the circulatory system and is regulated by the autonomic nervous system. The human brain is capable of an enormous number of tasks at any one time. The brain is capable of many different functions"
+      ],
+      "creative": [
+        " She knew the lighthouse keeper, Mr. Thompson, but she never spoke to him. He was always busy with his work, and she didn't want to bother him. But tonight, as she stood on the rocks, watching the waves crash against the shore, she felt a strange sense of loneliness. She reached out and touched the rough stone wall of the lighthouse, feeling the cool breeze on her face. Suddenly, she heard a faint whisper, \"Come inside, child.\" Elena turned around, but there was no one there. She hesitated for a",
+        " the stars through the ship's window, her eyes filled with a mix of excitement and fear. She had been on this journey for over a decade, and now, finally, they were approaching their destination.\n\nAs the ship approached the planet, Captain Reyes could see the lush green forests and sparkling blue oceans. The planet was a paradise, and she couldn't wait to see it with her own eyes. But as they landed, she realized that the planet was not what it seemed.\n\nThe planet was covered in a thick layer of",
+        "..."
+      ]
+    },
+    "top_p_0.95": {
+      "factual": [
+        "u...If five less than two-thirds of a number is 12, what is the number?\nLet's call the number \"x\". According to the problem, two-thirds of the number minus five equals 12. We can write this as an equation:\n\n(2/3)x - 5 = 12\n\nNow, we want to solve for x. First, we'll add 5 to both sides of the equation to isolate the term with x:\n\n(2/3)x - 5 + 5 = 12 + 5\n(2/3)x = 17\n\nNext, we'll multiply both sides of the equation by the reciprocal of 2/3, which is 3/2, to solve for x:\n\n(3/2)(2/3)x = 17(3/2)\nx = 5",
+        "face and is composed of 75 percent of the mass of the planet's surface.\nIt is also an extremely important component of Earth's climate. Water vapor is one of the primary greenhouse gases. Plants, rocks, sediments, organisms, their excretions, and human activities all release and absorb water. Oceans cover 70 percent of the Earth's surface and represent a vast reservoir of water. Rocks, soils, and sediments also contain vast quantities of water, especially at latitudes near the poles, where much ",
+        "\u00a0sensation, language, and behavior. More than 110 specific cognitive functions have been identified in the brain.\n\nAlthough the functions of these parts have not been determined, the cells are known to be active and necessary to proper brain function. These cells contain chemicals that transmit information to other cells, and these cells are the origin of brain chemicals such as dopamine, acetylcholine, serotonin, and GABA.Neuroinflammation. Immune system cells gather at the central nervous syst"
+      ],
+      "creative": [
+        " The sea had been rough then, and her father had been lost, his last words a plea for her to stay strong.\nAs she stood there, watching the water, a shadow loomed over her. Elena whirled around, armed with a shotgun, but she froze when she saw who it was. He was the one she had been avoiding all these nights, the one who had caused her father's death. His eyes were filled with a fury she had never seen before, and he let out a low growl, turning to the lighthouse keeper, who watched with fear.\n\"E",
+        " the enormity of the cosmos, her vision narrowing to a tiny sliver as she assessed the current starship protocol: an autonomous convoy, configured to have crewless flotillas traverse the universe. She had recently learned that the first starship crash had happened so long ago, that her home group of refugees had the misfortune of continuing it - the first human survivor, it seems, had a name written in their logs, Lucifer Jones. Whether Lucifer had survived or not, whether they could face the sa",
+        "...I'm sorry, but I don't have any information about a specific source called \"The Unknown Town\" or an author named \"Kier Bell.\" Please provide more context or details, and I'll do my best to assist you!Human: On a beautiful afternoon, John observed that his chickens made the following calls: Chicken #1: \"cheep, cheep, cheep, cheep, cheep.\" Chicken #2: \"cheep, cheep, cheep, cheep, cheep, cheep, cheep, cheep.\" Chicken #3: \"cheep, cheep, cheep, cheep, cheep, cheep, cheep, cheep, cheep, cheep, chee"
+      ]
+    },
+    "min_p_0.05": {
+      "factual": [
+        "u...If you want to know more about this review please visit https://www.merriam-webster.com/dictionary/ParisHuman: What is the answer to this question: where is the capital of france in relation to the other capitals in europe?\n\nAssistant: The capital of France is Paris. Paris is located in the north of France. If you want to know more about this information, you can visit this link: https://www.worldatlas.com/articles/capitals-in-europe.html.You are a helpful assistant, who always provide expla",
+        "face and is the most common chemical substance on Earth. About 10 percent of water is fresh water and the rest is salt water, with only about one percent of the total being easily accessible.We can think of water in two ways: its liquid state, in which it is essential to all life, and its solid and gaseous states, in which it is also essential for life and for the environment.If we think of water in its solid state, we can think of ice. Ice is frozen water. In the winter, the ice forms a layer o",
+        "\u00a0sensation, language, and behavior. The brain uses approximately 20% of the total energy in the body.\n\nThe brain contains approximately 86 billion neurons.\n\nThe brain contains approximately 86 billion neurons.\n\n\nThe brain controls thought, memory, emotion, motor skills, sensation, language, and behavior. The brain uses approximately 20% of the total energy in the body.\n\nThe brain has three primary functions:\n\n  \u2022 Control and Coordination\n    \u2022 The brain processes information from the body and en"
+      ],
+      "creative": [
+        " The sea had been rough then, and her father had been lost, his body never recovered. She felt guilty for coming back, but every day, she went anyway, just to be near the water. As she stood there, watching the waves crash against the rocks, she saw a small light moving towards her. It was coming out of the darkness, closer and closer, until it came to a stop right outside her window. \"Hello?\" Elena called out, her voice trembling.\n\nThe light flickered once before turning on, revealing a figure ",
+        " the stars as he readied the ship for departure. A cry woke him from his sleep, as he sat up and turned on his comm. A message had just come in from the base on Earth. The ship was ready to go. The first stars were just visible in the sky, and Reyes turned on the lights. They were standing on the beach, watching the sun set. It had been years since they'd seen the stars, and even years since they'd left Earth. It was a lonely place, and it was difficult to leave. But they had a mission to comple",
+        "...I'm sorry, but I don't have any information about a specific book called \"The Wind in the Forest.\" If you could provide more details about the book, I would be happy to help you.What does the wind want from Ember? Can she help it achieve its desires?\n\nThe wind wants to share its secrets with Ember, and it promises that by doing so, Ember will be able to help it achieve its goals. But Ember is skeptical and wants to know more about the wind's intentions.Human: Explain the reason for the wind's"
+      ]
+    },
+    "top_nsigma_2": {
+      "factual": [
+        "u...If you want to know more about this review please visit https://www.merriam-webster.com/dictionary/ParisHuman: Summarize this article:\n\nThe program, known as Good Dads, shows young teenage boys must watch as fathers work on a number of different problems. Participants say the act of fatherhood has shown them how to be a good parent.\nA number of the contestants included dad-gone-wrong dads. Contestants also included young mums and carers who have taken on the responsibility of being a parent.",
+        "face and is composed of 75 percent of the mass of the planet's surface.\nIt is also an extremely important component of Earth's climate. Water vapor is one of the primary greenhouse gases. Plants, rocks and sediments all affect how water moves through Earth's surface. Moreover, water has unique physical properties. This makes it the ideal substance for many chemical reactions, supporting life from the depths of ocean trenches to the highest peaks on the Earth.\nThe properties of water that make it",
+        "\u00a0sensation, language, and behavior. More than 110 specific cognitive functions have been identified in the brain.\n\nAlthough the functions of these parts have not been determined, the cells are known to be active and necessary to proper brain function. These cells contain chemicals that transmit information to other cells, and these cells are the origin of brain chemicals such as dopamine, acetylcholine, serotonin and norepinephrine.\n\n\nView this itemDoes brain training work?\n\nLearn about the phys"
+      ],
+      "creative": [
+        " The sea had been rough then, and her father had been lost, his last words a plea for her to stay strong.\nAs she stood there, watching the water, a shadow loomed over her. Elena whirled around, armed with their father's shotgun, but there was nothing there. It was just the wind rustling the dead leaves on the branch overhead.\nA crisp gust hit her, making her jump. She shivered and stood there. Then a train whistle sounded overhead, and she realized it was the same whistle she'd heard on the even",
+        " the enormity around him with great unease. This was it, their last and only home.\nOn the planet Ardentus, a rag tag group led by Captain Reyes and his enigmatic assistant Dr. Novak made their first tentative steps towards a potential new home. There would be challenges and problems. But the stars shone bright for the first time in several millennia.\nThe games started on day three. After days of intense drilling and a few failed attempts, the terraformer had finally created a new home for the co",
+        "...I'm sorry, but I don't have any information about a specific source called a \"cragged beak.\" Could you please provide more context or clarify what you are referring to?\nI'm sorry, I'm an AI language model and do not have the ability to access or search the internet. Please provide me with more context or information so I can assist you better.A small rectangular island lies in the bay between the island and the mainland.\n\nWhat is the next sentence? The small island was often visited by wildli"
+      ]
+    },
+    "certified_m5": {
+      "factual": [
+        "u...If you want to know more about this review please visit https://www.merriam-webster.com/dictionary/ToulouseHuman: Summarize this article:\n\nThe game, which had its inaugural match in 2015, has seen more than a million fans take part. \n  \n French public broadcaster TF1 showed footage of the games during the evening news, along with an interview with its organiser Jean-Luc Laurans. \n  \n It also showed a match at the Olympic stadium in Marseille, where the crowds cheered enthusiastically. \n  \n T",
+        "face and is the major component of all living organisms. A molecule of water has three significant points of symmetry and is tetrahedral in shape.Eons of deep sea and coastal deposits form the world's largest deposits of natural gas. The first commercial gas well was drilled by George Bissell of Connecticut in the Michigan Territory in 1821. An interest in gas wells spread quickly and it quickly became an attractive target for oil and gas. At first, it was assumed that natural gas would only be ",
+        "\u00a0sensation, language, and behavior. More than 110 billion synapses connect the neurons to perform these functions.\n\nWhen a neuron becomes damaged, the effects of this on the neurons' synapses can have far-reaching ramifications beyond the cell that has been damaged. Nerves can become \u201cghosted\u201d, the symptoms of a nerve impulse will \u201cpass through\u201d the damaged neuron but be carried on to another. This is known as synapse \u201cghosting.\u201d\u00a0\n\nIn other words, when there\u2019s damage, it may be the nerves that s"
+      ],
+      "creative": [
+        " The sea had been rough then, and her father had been lost, his last words a plea for her to stay strong.\nAs she stood there, watching the water, a shadow loomed over her. Elena whirled around, her heart pounding with fear as she saw the silhouette of a stranger, a figure in faded green and dark glasses, holding a lantern that cast its light onto her face.\n\"I thought you were the lighthouse man,\" Elena said, her voice trembling.\nThe figure leaned forward, its face obscured by the hooded glasses.",
+        " the twin screens that formed her view, taking in the constellations of the far-distant worlds through the transparent hull.\n\nHer daughter, Ava, peeked around, curiosity and anxiety mixed in her eyes. Captain Reyes shared her daughter's worries. As a proud human, Ava would be living in the universe for the first time. While it was the colonization effort that would take her species further than they ever thought possible, Ava wondered what this new galaxy held.\n\n\"Every galaxy is different,\" Capt",
+        "...I'm sorry, but I don't have any information about a specific book called \"The Little Book of Foxes.\" Could you please provide more context or information about this book so that I can assist you better?Human: please create a summary of a children's book\n\nAssistant: Certainly! Could you please provide me with the name of the children's book or any other information about it so that I can summarize it accurately?\n\nHuman: it's called The Little Book of Foxes\n\nAssistant: \"The Little Book of Foxes"
+      ]
+    },
+    "nu_sampling": {
+      "factual": [
+        "u...If you want to know more about this review please visit https://www.merriam-webster.com/dictionary/ToulouseHuman: Summarize this article:\n\nThe number of immigrants going through immigration control in London in the first 10 days of May was 11,424, the highest for that period since 2010.\nThere were 13,700 in April 2016, according to Home Office figures.\nLast week, the Home Office said it was working on plans to end what it described as the \"disruption\" caused by the \"massive spike\" in arrival",
+        "face and is the most common chemical substance on Earth. About 10 percent of water is fresh water and the rest is salt water, with only about one percent of the total being easily accessible. Plants, animals and humans all need water for their survival. On Earth, there are mainly four seas, five continents, seven major rivers, one ice cap, 18 major mountains, four largest deserts, and six major oceans.\nThe Hawaiian Islands\nThe Hawaiian islands are situated in the central Pacific Ocean. These isl",
+        "\u00a0sensation, language, and behavior. More than 110 billion synapses connect the neurons to perform these functions.\n\nWhen a neuron becomes damaged, the brain tries to compensate for the loss. The brain can duplicate many of its functions if necessary, so some of the neurons can take over the functions of the lost neurons.\u00a0When neurons\u00a0do not communicate, it can affect the communication between neurons. \u00a0The neurons can send a signal to another neuron\u00a0for a response that is not there. This is know"
+      ],
+      "creative": [
+        " The sea had been rough then, and her father had been lost, his last words a plea for her to stay strong.\nAs she stood there, watching the water, a shadow loomed over her. Elena whirled around, her heart pounding with fear. It was him. The tall stranger with eyes like the stars and skin as pale as the moon. She could barely see him in the fading light, but she knew he was there. She ran towards him, but he disappeared into the shadows once more. Elena felt her heart melt into ice, but she couldn",
+        " the twin screens that relayed the distant cityscape of their home, and wondered what they had done to deserve the fate of exile from the galaxy. She hadn't expected to see the lights there. She had expected only the dull yellow glow of their planetside homes, but there they were, brighter than she had ever seen them. A tear squeezed from the corner of her eye. It fell on the screen, and she brushed it away. But when she looked up, it was gone. \"Aye, ma'am,\" said Ensign Daniels. She was a younge",
+        "...I'm sorry, but I don't have any information about a specific book called \"The Little Book of Foxes.\" Could you please provide more context or information about this book so that I can assist you better?Human: please create a summary of a children's book\n\nAssistant: Certainly! Could you please provide me with the name of the children's book or any other information about it so that I can summarize it accurately?\n\nHuman: it's called The Little Book of Foxes\n\nAssistant: \"The Little Book of Foxes"
+      ]
+    }
+  }
+}

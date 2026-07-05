@@ -1,0 +1,67 @@
+{
+  "model": "Qwen/Qwen2.5-3B",
+  "epsilon": 0.001,
+  "n_samples": 50,
+  "bimodality": {
+    "factual": {
+      "n_modes": 35,
+      "bimodal": true,
+      "mean": 6.7715380931026115,
+      "std": 19.101942157577415,
+      "median": 0.3070426285266876
+    },
+    "creative": {
+      "n_modes": 18,
+      "bimodal": true,
+      "mean": 9.023800577538656,
+      "std": 12.708575171597396,
+      "median": 2.085944175720215
+    }
+  },
+  "online": {
+    "fixed": {
+      "error_rate": 0.3296212176716243,
+      "target_beta": 0.9,
+      "gap": 0.5703787823283757,
+      "mean_margin": 27.926883316040037
+    },
+    "cumulative": {
+      "error_rate": 0.001147825237502137,
+      "target_beta": 0.9,
+      "gap": 0.8988521747624979,
+      "mean_margin": 99.92132457590576
+    },
+    "proposed": {
+      "error_rate": 0.8056023640315529,
+      "target_beta": 0.9,
+      "gap": 0.09439763596844708,
+      "mean_margin": 16.40151653908959
+    }
+  },
+  "falsification": {
+    "cumulative_loss_rate": 4.995,
+    "proposed_recovery_time": 0,
+    "cumulative_linear": "True",
+    "proposed_recovers": true
+  },
+  "long_sequences": {
+    "256": {
+      "mean": 14.286205916380391,
+      "std": 13.359067207890323,
+      "p95": 33.71258068084716,
+      "median": 11.34785270690918
+    },
+    "512": {
+      "mean": 12.450495094976018,
+      "std": 12.889417881617966,
+      "p95": 32.982559204101555,
+      "median": 8.140676021575928
+    },
+    "1024": {
+      "mean": 12.092808993214156,
+      "std": 14.122964156285004,
+      "p95": 33.38333301544189,
+      "median": 6.53670597076416
+    }
+  }
+}

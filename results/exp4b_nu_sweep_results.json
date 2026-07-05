@@ -1,0 +1,162 @@
+{
+  "top_nsigma_2": {
+    "factual": {
+      "repetition_rate": 0.02231426023745832,
+      "distinct-1": 0.5488484037977258,
+      "distinct-2": 0.867193810797651,
+      "distinct-3": 0.9434384192805244,
+      "trigram_repeat_frac": 0.03711288445824733
+    },
+    "creative": {
+      "repetition_rate": 0.0008333333333333334,
+      "distinct-1": 0.5975016583747927,
+      "distinct-2": 0.9152043551088778,
+      "distinct-3": 0.9740106255181632,
+      "trigram_repeat_frac": 0.0225105235566665
+    }
+  },
+  "nu_k5_m1": {
+    "factual": {
+      "repetition_rate": 0.022428679764613157,
+      "distinct-1": 0.5192552750535716,
+      "distinct-2": 0.7952715365503186,
+      "distinct-3": 0.8847552720184297,
+      "trigram_repeat_frac": 0.10243684815880469
+    },
+    "creative": {
+      "repetition_rate": 0.0003333333333333333,
+      "distinct-1": 0.557672470978441,
+      "distinct-2": 0.8773115577889449,
+      "distinct-3": 0.9489831311439353,
+      "trigram_repeat_frac": 0.05969203917828933
+    }
+  },
+  "nu_k10_m1": {
+    "factual": {
+      "repetition_rate": 0.025353990992631956,
+      "distinct-1": 0.5736560070699013,
+      "distinct-2": 0.8498975093424953,
+      "distinct-3": 0.9209676590466063,
+      "trigram_repeat_frac": 0.06331376929408056
+    },
+    "creative": {
+      "repetition_rate": 0.0005,
+      "distinct-1": 0.5910514096185738,
+      "distinct-2": 0.8988735343383586,
+      "distinct-3": 0.9644578109402231,
+      "trigram_repeat_frac": 0.03309257374699551
+    }
+  },
+  "nu_k20_m1": {
+    "factual": {
+      "repetition_rate": 0.02301481346557473,
+      "distinct-1": 0.5773997544304191,
+      "distinct-2": 0.851282472538004,
+      "distinct-3": 0.9208148148148148,
+      "trigram_repeat_frac": 0.07302380372745164
+    },
+    "creative": {
+      "repetition_rate": 0.0005,
+      "distinct-1": 0.6232628524046434,
+      "distinct-2": 0.9182244556113903,
+      "distinct-3": 0.9763548381638835,
+      "trigram_repeat_frac": 0.020294198200729436
+    }
+  },
+  "nu_k5_m3": {
+    "factual": {
+      "repetition_rate": 0.020975893444955162,
+      "distinct-1": 0.5448275538454319,
+      "distinct-2": 0.8290558930639933,
+      "distinct-3": 0.9094596845649475,
+      "trigram_repeat_frac": 0.06455626453980698
+    },
+    "creative": {
+      "repetition_rate": 0.0,
+      "distinct-1": 0.6092943615257049,
+      "distinct-2": 0.9210217755443886,
+      "distinct-3": 0.9796930781855405,
+      "trigram_repeat_frac": 0.017586125169238496
+    }
+  },
+  "nu_k10_m3": {
+    "factual": {
+      "repetition_rate": 0.021395665844027047,
+      "distinct-1": 0.5717051366274067,
+      "distinct-2": 0.8649194563197413,
+      "distinct-3": 0.935082314371788,
+      "trigram_repeat_frac": 0.04856925185834183
+    },
+    "creative": {
+      "repetition_rate": 0.0003333333333333333,
+      "distinct-1": 0.6263955223880598,
+      "distinct-2": 0.9321984924623116,
+      "distinct-3": 0.984723279698154,
+      "trigram_repeat_frac": 0.013574703069209198
+    }
+  },
+  "nu_k20_m3": {
+    "factual": {
+      "repetition_rate": 0.020638777874208758,
+      "distinct-1": 0.5533859196346175,
+      "distinct-2": 0.8394962493109946,
+      "distinct-3": 0.9199222045011519,
+      "trigram_repeat_frac": 0.06605673504528578
+    },
+    "creative": {
+      "repetition_rate": 0.00016666666666666666,
+      "distinct-1": 0.6378266998341625,
+      "distinct-2": 0.9361943048576216,
+      "distinct-3": 0.9820364448505151,
+      "trigram_repeat_frac": 0.01637500720910183
+    }
+  },
+  "nu_k5_m5": {
+    "factual": {
+      "repetition_rate": 0.020460832949395158,
+      "distinct-1": 0.5778306195548465,
+      "distinct-2": 0.8747600951928559,
+      "distinct-3": 0.9397104377104376,
+      "trigram_repeat_frac": 0.043391952883800204
+    },
+    "creative": {
+      "repetition_rate": 0.002,
+      "distinct-1": 0.6153996683250416,
+      "distinct-2": 0.921509212730318,
+      "distinct-3": 0.9788479434208077,
+      "trigram_repeat_frac": 0.017954958488805475
+    }
+  },
+  "nu_k10_m5": {
+    "factual": {
+      "repetition_rate": 0.01980503084005671,
+      "distinct-1": 0.5813969624450599,
+      "distinct-2": 0.8731364831739842,
+      "distinct-3": 0.9341469076732235,
+      "trigram_repeat_frac": 0.04861534039943038
+    },
+    "creative": {
+      "repetition_rate": 0.0033333333333333335,
+      "distinct-1": 0.6278781094527365,
+      "distinct-2": 0.925531825795645,
+      "distinct-3": 0.9771864372366885,
+      "trigram_repeat_frac": 0.017464393478676232
+    }
+  },
+  "nu_k20_m5": {
+    "factual": {
+      "repetition_rate": 0.021778318267480497,
+      "distinct-1": 0.5722576447218182,
+      "distinct-2": 0.8689748434187046,
+      "distinct-3": 0.9344372674109517,
+      "trigram_repeat_frac": 0.043728977718330696
+    },
+    "creative": {
+      "repetition_rate": 0.0028333333333333335,
+      "distinct-1": 0.6338714759535656,
+      "distinct-2": 0.9262102177554438,
+      "distinct-3": 0.9781965382467895,
+      "trigram_repeat_frac": 0.01630639294290347
+    }
+  }
+}

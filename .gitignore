@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+
+# Data files (large)
+*.pt
+*.bin
+*.safetensors
+autodl-tmp/
+
+# Results (large binary)
+results/*.pt
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Jupyter
+.ipynb_checkpoints/
