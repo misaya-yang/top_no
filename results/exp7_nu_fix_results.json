@@ -1,0 +1,79 @@
+{
+  "model": "Qwen/Qwen2.5-3B",
+  "results": {
+    "greedy": {
+      "gsm8k_accuracy": 0.2,
+      "creative_agg": {
+        "length": 201.56666666666666,
+        "distinct-1": 0.4872113583215368,
+        "distinct-2": 0.7963884167791604,
+        "distinct-3": 0.8828044945580906,
+        "rep_rate": 0.004788111837854135,
+        "tri_rep": 0.1039870897469188,
+        "vocab_richness": 0.4872113583215368
+      }
+    },
+    "top_p_0.95": {
+      "gsm8k_accuracy": 0.16,
+      "creative_agg": {
+        "length": 201.56666666666666,
+        "distinct-1": 0.571356479026491,
+        "distinct-2": 0.8925788504446193,
+        "distinct-3": 0.9603419392943032,
+        "rep_rate": 0.004453103462644755,
+        "tri_rep": 0.03015839236203876,
+        "vocab_richness": 0.571356479026491
+      }
+    },
+    "nu_original": {
+      "gsm8k_accuracy": 0.14,
+      "creative_agg": {
+        "length": 201.56666666666666,
+        "distinct-1": 0.5992297503556021,
+        "distinct-2": 0.9188095100210008,
+        "distinct-3": 0.977647448454623,
+        "rep_rate": 0.004953103462644755,
+        "tri_rep": 0.01921506802002432,
+        "vocab_richness": 0.5992297503556021
+      }
+    },
+    "nu_topp_floor": {
+      "gsm8k_accuracy": 0.1,
+      "creative_agg": {
+        "length": 201.56666666666666,
+        "distinct-1": 0.6139006374442383,
+        "distinct-2": 0.9172957874591177,
+        "distinct-3": 0.9723140974465803,
+        "rep_rate": 0.004785607608581737,
+        "tri_rep": 0.025227667556654832,
+        "vocab_richness": 0.6139006374442383
+      }
+    },
+    "nu_entropy": {
+      "gsm8k_accuracy": 0.12,
+      "creative_agg": {
+        "length": 201.56666666666666,
+        "distinct-1": 0.5891592444417846,
+        "distinct-2": 0.9106819258252685,
+        "distinct-3": 0.9719620821446056,
+        "rep_rate": 0.004620607650249445,
+        "tri_rep": 0.021911642783348815,
+        "vocab_richness": 0.5891592444417846
+      }
+    },
+    "nu_mathboost": {
+      "gsm8k_accuracy": 0.18,
+      "creative_agg": {
+        "length": 201.56666666666666,
+        "distinct-1": 0.5982646373778859,
+        "distinct-2": 0.9194800701649305,
+        "distinct-3": 0.9776523081347556,
+        "rep_rate": 0.004953103462644755,
+        "tri_rep": 0.019043785010910586,
+        "vocab_richness": 0.5982646373778859
+      }
+    }
+  },
+  "baseline_top_p_acc": 0.16,
+  "nu_original_acc": 0.14
+}
