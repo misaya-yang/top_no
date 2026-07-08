@@ -2,8 +2,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$REPO_ROOT"
 mkdir -p results
+export PYTHONPATH="$REPO_ROOT/experiments:${PYTHONPATH:-}"
 
 # Use local HF cache (no internet needed)
 export HF_HOME=/root/autodl-tmp/huggingface
@@ -24,7 +26,7 @@ echo ""
 echo "============================================================"
 echo "▶ Exp 1: Top-K Bias + Zipf + Synthetic K* + Coverage + Rank Ablation"
 echo "============================================================"
-time python3 exp1_topk_bias.py \
+time python3 experiments/exp1_topk_bias.py \
     --model "Qwen/Qwen2.5-3B" \
     --n-samples 2000 \
     --max-length 256 \
@@ -35,7 +37,7 @@ echo ""
 echo "============================================================"
 echo "▶ Exp 2: Identifiability + n-Sweep + Full-KL + Two-Point + Corollary"
 echo "============================================================"
-time python3 exp2_identifiability.py \
+time python3 experiments/exp2_identifiability.py \
     --teacher "Qwen/Qwen2.5-7B" \
     --student "Qwen/Qwen2.5-3B" \
     --n-samples 2000 \
@@ -47,7 +49,7 @@ echo ""
 echo "============================================================"
 echo "▶ Exp 3: Lyapunov + Bimodality + Online Margin + Burst-Calm + Long Seq"
 echo "============================================================"
-time python3 exp3_lyapunov.py \
+time python3 experiments/exp3_lyapunov.py \
     --model "Qwen/Qwen2.5-3B" \
     --n-samples 50 \
     --min-tokens 200 \
