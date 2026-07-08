@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-Experiment 7: ν-sampling Fixes for Reasoning Tasks
+Experiment 7: Domain-Aware ν-sampling for Reasoning Tasks
 =====================================================
 Addresses the GSM8K accuracy drop (14% vs top-p 18%).
 
 Three fix strategies:
   Fix 1: Top-K safeguard — always keep top-K tokens regardless of frequency
-  Fix 2: Entropy-gated κ — reduce frequency penalty when model is confident
-  Fix 3: Math-boosted frequency table — inflate math token frequencies
+  Fix 2: Entropy-gated κ — tighten the uncertainty margin when model is confident
+  Fix 3: Math-boosted frequency table — treat domain-frequent math tokens as
+         better-estimated tokens with a smaller uncertainty radius
 
 Evaluates on both GSM8K (reasoning) and creative (diversity) tasks.
 """
@@ -15,12 +16,12 @@ import argparse, json, os, time, re
 from collections import Counter
 import numpy as np
 import torch
-import torch.nn.functional as F
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from data_utils import load_model_and_tokenizer
+from samplers import batch_generate
 
 
 def parse_args():
@@ -34,134 +35,6 @@ def parse_args():
     p.add_argument("--output-dir", type=str, default="./results")
     p.add_argument("--seed", type=int, default=42)
     return p.parse_args()
-
-
-# ══════════════════════════════════════════════════════════════
-#  Truncation Strategies (original + 3 fixes)
-# ══════════════════════════════════════════════════════════════
-
-def apply_truncation(logits, strategy, token_freq_table=None, **kwargs):
-    """Apply truncation to batched logits (B, V)."""
-    logits = logits.clone()
-
-    if strategy == "top_p":
-        p = kwargs.get("p", 0.95)
-        probs = F.softmax(logits, dim=-1)
-        sorted_probs, sorted_idx = probs.sort(dim=-1, descending=True)
-        cum_probs = sorted_probs.cumsum(dim=-1)
-        mask = cum_probs > p
-        mask[..., 0] = False
-        sorted_logits = logits.gather(-1, sorted_idx)
-        sorted_logits[mask] = float("-inf")
-        _, inv_idx = sorted_idx.sort(dim=-1)
-        logits = sorted_logits.gather(-1, inv_idx)
-
-    elif strategy == "top_nsigma":
-        n_sigma = kwargs.get("n_sigma", 2.0)
-        sigma = logits.std(dim=-1, keepdim=True)
-        s_max = logits.max(dim=-1, keepdim=True).values
-        keep = (s_max - logits) <= n_sigma * sigma
-        logits[~keep] = float("-inf")
-
-    elif strategy == "nu":
-        # Original ν-sampling
-        kappa = kwargs.get("kappa", 10.0)
-        m0 = kwargs.get("m0", 3.0)
-        s_max = logits.max(dim=-1, keepdim=True).values
-        n_i = token_freq_table.to(logits.device).float().unsqueeze(0).expand_as(logits)
-        margin = m0 + kappa / torch.sqrt(n_i + 1)
-        keep = (s_max - logits) <= margin
-        logits[~keep] = float("-inf")
-
-    elif strategy == "nu_topp_floor":
-        # Fix 1: ν with top-p safety floor
-        # Never truncates more aggressively than top-p=0.95
-        # Combines frequency-aware precision with top-p's recall guarantee
-        kappa = kwargs.get("kappa", 10.0)
-        m0 = kwargs.get("m0", 3.0)
-        p = kwargs.get("p", 0.95)
-        s_max = logits.max(dim=-1, keepdim=True).values
-        n_i = token_freq_table.to(logits.device).float().unsqueeze(0).expand_as(logits)
-        nu_margin = m0 + kappa / torch.sqrt(n_i + 1)
-        # Compute top-p threshold in logit space
-        probs = F.softmax(logits, dim=-1)
-        sorted_probs, sorted_idx = probs.sort(dim=-1, descending=True)
-        cum_probs = sorted_probs.cumsum(dim=-1)
-        sorted_logits = logits.gather(-1, sorted_idx)
-        # Find the logit value at the top-p cutoff
-        past_p = cum_probs > p
-        past_p[..., 0] = False
-        # For each row, find the first index past p → that logit is the floor
-        # Use -inf for tokens past top-p cutoff (they'd be removed by top-p)
-        # Tokens within top-p get floor = their own logit (they survive)
-        sorted_logits_masked = sorted_logits.clone()
-        sorted_logits_masked[past_p] = float("-inf")
-        # The top-p floor margin = s_max - min surviving logit
-        min_surviving = sorted_logits_masked.max(dim=-1, keepdim=True).values  # max of surviving = s_max
-        # Actually, we want the MINIMUM surviving logit
-        # Replace -inf with large positive for min computation
-        sorted_for_min = sorted_logits_masked.clone()
-        sorted_for_min[past_p] = float("inf")  # excluded tokens get +inf
-        min_surviving_logit = sorted_for_min.min(dim=-1, keepdim=True).values
-        # Handle case where all tokens survive top-p
-        min_surviving_logit = torch.where(
-            torch.isinf(min_surviving_logit),
-            s_max - nu_margin,  # fallback to nu margin
-            min_surviving_logit
-        )
-        topp_floor_margin = (s_max - min_surviving_logit).clamp(min=0)
-        # Effective margin = max of both → never more aggressive than top-p
-        margin = torch.maximum(nu_margin, topp_floor_margin)
-        keep = (s_max - logits) <= margin
-        logits[~keep] = float("-inf")
-
-    elif strategy == "nu_entropy":
-        # Fix 2: Entropy-gated κ
-        # When model is confident (low entropy) → reduce frequency penalty
-        # When model is uncertain (high entropy) → use full frequency penalty
-        kappa = kwargs.get("kappa", 10.0)
-        m0 = kwargs.get("m0", 3.0)
-        s_max = logits.max(dim=-1, keepdim=True).values
-        n_i = token_freq_table.to(logits.device).float().unsqueeze(0).expand_as(logits)
-
-        # Compute entropy safely from PRE-truncation distribution
-        # Use log-sum-exp trick for numerical stability
-        logits_centered = logits - s_max  # numerical stability
-        log_probs = logits_centered - torch.logsumexp(logits_centered, dim=-1, keepdim=True)
-        probs = log_probs.exp()
-        # Entropy = -Σ p·log(p), computed in log-space for stability
-        log_probs_safe = torch.where(probs > 1e-10, log_probs, torch.zeros_like(log_probs))
-        entropy = -(probs * log_probs_safe).sum(dim=-1, keepdim=True)
-        entropy = entropy.clamp(min=0)
-
-        # Normalize by log of effective vocabulary support
-        # Typical LLM: 50-500 effective tokens → log(100)≈4.6
-        log_eff_support = torch.log(torch.tensor(100.0, device=logits.device))
-        entropy_ratio = (entropy / log_eff_support).clamp(0.05, 1.0)
-
-        # Low entropy (confident) → small κ → preserve rare-but-correct tokens
-        # High entropy (uncertain) → large κ → stronger frequency filtering
-        kappa_eff = kappa * entropy_ratio
-        margin = m0 + kappa_eff / torch.sqrt(n_i + 1)
-        keep = (s_max - logits) <= margin
-        logits[~keep] = float("-inf")
-
-    elif strategy == "nu_mathboost":
-        # Fix 3: Math-boosted frequency table
-        # Inflate frequencies of math tokens so they aren't penalized
-        kappa = kwargs.get("kappa", 10.0)
-        m0 = kwargs.get("m0", 3.0)
-        math_freq = kwargs.get("math_freq_table")
-        s_max = logits.max(dim=-1, keepdim=True).values
-        general_n = token_freq_table.to(logits.device).float()
-        math_n = math_freq.to(logits.device).float()
-        combined_n = torch.max(general_n, math_n)
-        n_i = combined_n.unsqueeze(0).expand_as(logits)
-        margin = m0 + kappa / torch.sqrt(n_i + 1)
-        keep = (s_max - logits) <= margin
-        logits[~keep] = float("-inf")
-
-    return logits
 
 
 # ══════════════════════════════════════════════════════════════
@@ -225,71 +98,6 @@ def build_math_freq_table(tokenizer, vocab_size, boost_factor=50):
             math_counts[tid] += boost_factor
 
     return math_counts
-
-
-# ══════════════════════════════════════════════════════════════
-#  Generation & Evaluation
-# ══════════════════════════════════════════════════════════════
-
-@torch.no_grad()
-def batch_generate(model, tokenizer, prompt_texts, max_new_tokens, batch_size,
-                   strategy, strategy_kwargs, temperature=1.0):
-    """Batched KV-cache generation."""
-    device = next(model.parameters()).device
-    all_results = []
-
-    for batch_start in range(0, len(prompt_texts), batch_size):
-        batch_prompts = prompt_texts[batch_start:batch_start + batch_size]
-        B = len(batch_prompts)
-        enc = tokenizer(batch_prompts, return_tensors="pt", padding=True,
-                        truncation=True, max_length=100).to(device)
-        input_ids = enc["input_ids"]
-        attention_mask = enc["attention_mask"]
-        prompt_lens = attention_mask.sum(dim=-1).cpu().tolist()
-        generated = input_ids.clone()
-        gen_mask = attention_mask.clone()
-        past_key_values = None
-
-        for step in range(max_new_tokens):
-            if step == 0:
-                outputs = model(input_ids=generated, attention_mask=gen_mask,
-                                use_cache=True)
-            else:
-                outputs = model(input_ids=generated[:, -1:],
-                                attention_mask=gen_mask,
-                                past_key_values=past_key_values,
-                                use_cache=True)
-            past_key_values = outputs.past_key_values
-            next_logits = outputs.logits[:, -1, :] / temperature
-
-            if strategy == "greedy":
-                next_tokens = next_logits.argmax(dim=-1, keepdim=True)
-            else:
-                next_logits_trunc = apply_truncation(
-                    next_logits, strategy, **strategy_kwargs)
-                probs = F.softmax(next_logits_trunc, dim=-1)
-                for b in range(B):
-                    # Handle all-inf or NaN: fallback to original logits
-                    if probs[b].sum() < 0.5 or torch.isnan(probs[b]).any():
-                        probs[b] = F.softmax(
-                            outputs.logits[b, -1, :] / temperature, dim=-1)
-                    # Final safety: replace any remaining NaN with uniform
-                    probs[b] = torch.nan_to_num(probs[b], nan=0.0)
-                    if probs[b].sum() < 1e-6:
-                        probs[b] = torch.ones_like(probs[b]) / probs[b].shape[-1]
-                next_tokens = torch.multinomial(probs, num_samples=1)
-
-            generated = torch.cat([generated, next_tokens], dim=-1)
-            gen_mask = torch.cat([gen_mask,
-                torch.ones(B, 1, device=device, dtype=gen_mask.dtype)], dim=-1)
-
-        for b in range(B):
-            plen = prompt_lens[b]
-            gen_ids = generated[b, plen:]
-            text = tokenizer.decode(gen_ids, skip_special_tokens=True)
-            all_results.append({"text": text, "tokens": gen_ids.cpu().tolist()})
-
-    return all_results
 
 
 def evaluate_gsm8k(questions, generated_results):

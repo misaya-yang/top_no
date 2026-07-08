@@ -7,12 +7,12 @@ import argparse, json, os, time
 from collections import Counter
 import numpy as np
 import torch
-import torch.nn.functional as F
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from data_utils import load_model_and_tokenizer, load_gsm8k_passages, load_creative_passages
+from samplers import batch_generate
 
 
 def parse_args():
@@ -25,95 +25,6 @@ def parse_args():
     p.add_argument("--output-dir", type=str, default="./results")
     p.add_argument("--seed", type=int, default=42)
     return p.parse_args()
-
-
-def apply_truncation(logits, strategy, token_freq_table=None, **kwargs):
-    """Apply truncation strategy to batched logits. logits: (B, V)"""
-    if strategy == "top_nsigma":
-        n_sigma = kwargs.get("n_sigma", 2.0)
-        sigma = logits.std(dim=-1, keepdim=True)
-        s_max = logits.max(dim=-1, keepdim=True).values
-        keep = (s_max - logits) <= n_sigma * sigma
-        logits[~keep] = float("-inf")
-    elif strategy == "nu":
-        kappa = kwargs.get("kappa", 10.0)
-        m0 = kwargs.get("m0", 3.0)
-        s_max = logits.max(dim=-1, keepdim=True).values
-        n_i = token_freq_table.to(logits.device).float().unsqueeze(0).expand_as(logits)
-        margin = m0 + kappa / torch.sqrt(n_i + 1)
-        keep = (s_max - logits) <= margin
-        logits[~keep] = float("-inf")
-    return logits
-
-
-@torch.no_grad()
-def batch_generate(model, tokenizer, prompt_texts, max_new_tokens, batch_size,
-                   strategy, strategy_kwargs, temperature=1.0):
-    """Batch generation with KV cache. Returns list of generated token lists."""
-    device = next(model.parameters()).device
-    all_generated = []
-
-    # Process in batches
-    for batch_start in range(0, len(prompt_texts), batch_size):
-        batch_prompts = prompt_texts[batch_start:batch_start + batch_size]
-        B = len(batch_prompts)
-
-        # Tokenize with padding
-        enc = tokenizer(batch_prompts, return_tensors="pt", padding=True,
-                        truncation=True, max_length=80).to(device)
-        input_ids = enc["input_ids"]        # (B, T_prompt)
-        attention_mask = enc["attention_mask"]  # (B, T_prompt)
-        prompt_lens = attention_mask.sum(dim=-1).cpu().tolist()
-
-        # Initialize generated sequences
-        generated = input_ids.clone()  # (B, T_prompt)
-        gen_mask = attention_mask.clone()  # (B, T_prompt)
-
-        # KV cache
-        past_key_values = None
-
-        for step in range(max_new_tokens):
-            if step == 0:
-                # First step: process full prompt
-                outputs = model(input_ids=generated, attention_mask=gen_mask,
-                                use_cache=True)
-                past_key_values = outputs.past_key_values
-                next_logits = outputs.logits[:, -1, :]  # (B, V)
-            else:
-                # Subsequent steps: only the last token
-                outputs = model(input_ids=generated[:, -1:],
-                                attention_mask=gen_mask,
-                                past_key_values=past_key_values,
-                                use_cache=True)
-                past_key_values = outputs.past_key_values
-                next_logits = outputs.logits[:, -1, :]  # (B, V)
-
-            # Temperature
-            next_logits = next_logits / temperature
-
-            # Apply truncation (modifies in-place)
-            next_logits = apply_truncation(next_logits.clone(), strategy,
-                                           **strategy_kwargs)
-
-            # Sample
-            probs = F.softmax(next_logits, dim=-1)
-            # Handle all-inf rows (fallback to untruncated)
-            for b in range(B):
-                if probs[b].sum() < 0.5:
-                    fallback = F.softmax(outputs.logits[b, -1, :] / temperature, dim=-1)
-                    probs[b] = fallback
-
-            next_tokens = torch.multinomial(probs, num_samples=1)  # (B, 1)
-            generated = torch.cat([generated, next_tokens], dim=-1)
-            gen_mask = torch.cat([gen_mask, torch.ones(B, 1, device=device, dtype=gen_mask.dtype)], dim=-1)
-
-        # Extract generated tokens (remove prompt)
-        for b in range(B):
-            plen = prompt_lens[b]
-            gen_tokens = generated[b, plen:].cpu().tolist()
-            all_generated.append(gen_tokens)
-
-    return all_generated
 
 
 def compute_metrics(gen_tokens):
@@ -150,7 +61,8 @@ def run_strategy(model, tokenizer, prompts_by_label, strategy, strategy_kwargs,
         torch.manual_seed(seed)
         all_gen = batch_generate(
             model, tokenizer, prompt_texts, max_new_tokens, batch_size,
-            strategy, strategy_kwargs, temperature
+            strategy, strategy_kwargs, temperature, max_prompt_length=80,
+            return_dict=False
         )
         metrics_list = [compute_metrics(g) for g in all_gen]
         results[label] = {
@@ -269,7 +181,7 @@ def main():
         ax.set_xticklabels(kappa_values)
         ax.set_yticks(range(len(m0_values)))
         ax.set_yticklabels(m0_values)
-        ax.set_xlabel("κ (frequency penalty)", fontsize=12)
+        ax.set_xlabel("κ (uncertainty margin scale)", fontsize=12)
         ax.set_ylabel("m₀ (base margin)", fontsize=12)
         titles = {"repetition_rate": "Token Repetition (↓ better)",
                    "distinct-2": "Distinct-2 (↑ better)",

@@ -23,6 +23,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from data_utils import load_model_and_tokenizer, load_gsm8k_passages, load_creative_passages
+from samplers import apply_truncation
 
 
 def parse_args():
@@ -51,22 +52,7 @@ def truncate_certified(logits, margin=5.0):
 
 def truncate_top_p(logits, p=0.95):
     """Nucleus (top-p) sampling."""
-    probs = F.softmax(logits, dim=-1)
-    sorted_probs, sorted_idx = probs.sort(dim=-1, descending=True)
-    cum_probs = sorted_probs.cumsum(dim=-1)
-    # Find cutoff where cumulative prob exceeds p
-    mask = cum_probs > p
-    # Keep at least one token
-    mask[..., 0] = False
-    # Map back to original order
-    sorted_probs[mask] = 0
-    logits_masked = logits.clone()
-    # Set masked positions to -inf
-    _, inv_idx = sorted_idx.sort(dim=-1)
-    sorted_logits = logits.gather(-1, sorted_idx)
-    sorted_logits[mask] = float("-inf")
-    logits_masked = sorted_logits.gather(-1, inv_idx)
-    return logits_masked
+    return apply_truncation(logits, "top_p", p=p)
 
 
 def truncate_min_p(logits, p_min=0.05):
@@ -81,32 +67,22 @@ def truncate_min_p(logits, p_min=0.05):
 
 def truncate_top_nsigma(logits, n_sigma=2.0):
     """top-nσ: keep tokens within n*std of max logit."""
-    sigma = logits.std(dim=-1, keepdim=True)
-    s_max = logits.max(dim=-1, keepdim=True).values
-    keep = (s_max - logits) <= n_sigma * sigma
-    logits_masked = logits.clone()
-    logits_masked[~keep] = float("-inf")
-    return logits_masked
+    return apply_truncation(logits, "top_nsigma", n_sigma=n_sigma)
 
 
 def truncate_nu_sampling(logits, token_freq_table, kappa=2.0, m0=3.0):
     """
     ν-sampling: frequency-dependent margin.
     Keep i iff s_max - s_i ≤ m₀ + κ/√(n_i + 1)
-    Rare tokens need higher relative probability to survive.
+    Lower-frequency tokens receive a larger uncertainty margin.
     """
-    s_max = logits.max(dim=-1, keepdim=True).values
-    # Get frequency for each token in vocabulary
-    # token_freq_table: tensor of shape (vocab_size,) with corpus counts
-    n_i = token_freq_table.to(logits.device).float().unsqueeze(0)  # (1, V)
-    # Broadcast to match logits shape
-    if logits.dim() == 2:
-        n_i = n_i.expand_as(logits)
-    margin = m0 + kappa / torch.sqrt(n_i + 1)
-    keep = (s_max - logits) <= margin
-    logits_masked = logits.clone()
-    logits_masked[~keep] = float("-inf")
-    return logits_masked
+    return apply_truncation(
+        logits,
+        "nu",
+        token_freq_table=token_freq_table,
+        kappa=kappa,
+        m0=m0,
+    )
 
 
 # ══════════════════════════════════════════════════════════════
@@ -119,6 +95,7 @@ def generate_with_strategy(model, tokenizer, prompt_ids, max_new_tokens,
     device = next(model.parameters()).device
     generated = prompt_ids.clone()
     past_key_values = None
+    eos_token_id = tokenizer.eos_token_id
 
     for step in range(max_new_tokens):
         with torch.no_grad():
@@ -129,19 +106,22 @@ def generate_with_strategy(model, tokenizer, prompt_ids, max_new_tokens,
                                 past_key_values=past_key_values)
             past_key_values = outputs.past_key_values
 
-        logits = outputs.logits[:, -1, :] / temperature
+        raw_logits = outputs.logits[:, -1, :]
 
         # Apply truncation strategy
-        logits_truncated = strategy_fn(logits, **strategy_kwargs)
+        logits_truncated = strategy_fn(raw_logits, **strategy_kwargs)
 
         # Sample from truncated distribution
-        probs = F.softmax(logits_truncated, dim=-1)
-        # Handle case where all logits are -inf (fallback to uniform)
-        if probs.sum() < 0.5:
-            probs = F.softmax(logits, dim=-1)
+        if temperature <= 0:
+            raise ValueError("temperature must be positive")
+        probs = F.softmax(logits_truncated / temperature, dim=-1)
+        if not torch.isfinite(probs).all() or probs.sum() <= 0:
+            raise RuntimeError("Invalid truncated distribution; refusing silent fallback.")
 
         next_token = torch.multinomial(probs, num_samples=1)
         generated = torch.cat([generated, next_token], dim=-1)
+        if eos_token_id is not None and int(next_token.item()) == eos_token_id:
+            break
 
     return generated
 
@@ -149,9 +129,10 @@ def generate_with_strategy(model, tokenizer, prompt_ids, max_new_tokens,
 def compute_metrics(tokenizer, prompt_ids, generated_ids, reference_texts=None):
     """Compute text quality and diversity metrics."""
     # Decode generated tokens (excluding prompt)
-    gen_text = tokenizer.decode(generated_ids[0][prompt_ids.shape[1]:],
-                                skip_special_tokens=True)
     gen_tokens = generated_ids[0][prompt_ids.shape[1]:].cpu().tolist()
+    if tokenizer.eos_token_id is not None and tokenizer.eos_token_id in gen_tokens:
+        gen_tokens = gen_tokens[:gen_tokens.index(tokenizer.eos_token_id)]
+    gen_text = tokenizer.decode(gen_tokens, skip_special_tokens=True)
 
     metrics = {}
 

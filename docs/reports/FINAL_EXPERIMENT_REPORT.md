@@ -1,6 +1,20 @@
 # 最终实验验证报告（CCF-A 投稿版）
 ## Truncation Sampling as Hypothesis Testing under an Identified Noise Channel
 
+> **2026-07-08 reproducibility audit note**
+>
+> This report predates the sampler/generation fixes in
+> `experiments/samplers.py`. In particular, downstream results were produced
+> before standard top-p crossing-token handling, left-padded generation,
+> EOS-aware metric slicing, raw-logit truncation before temperature scaling, and
+> no-fallback sampler validation were added. Treat all downstream quality claims
+> in this report as legacy until Exp4C, Exp6, and Exp7 are rerun.
+>
+> The current nu formula
+> `s_max - s_i <= m0 + kappa / sqrt(n_i + 1)` gives lower-frequency tokens a
+> larger margin. It should be interpreted as uncertainty-aware conservative
+> retention, not as a rare-token penalty.
+
 **日期**: 2026-07-05  
 **硬件**: NVIDIA RTX 5090 (32GB), Python 3.12, PyTorch 2.8, Transformers 4.57  
 **模型**: Qwen2.5-3B (student/self-channel), Qwen2.5-7B (teacher, original Exp2)  
@@ -218,8 +232,7 @@ top_nsigma_2 (base)    0.0116       0.8912       0.0298
 **参数规律与理论一致：**
 - **κ=10 ≈ σ_max**：Exp2 测得 σ₀²=0.35, c=84 → σ(n=1) = √84 ≈ 9.2，κ=10 恰好覆盖最大噪声
 - m₀=3 ≈ 论文 Theorem X.1 的 margin 下界
-- κ=5 太松（放过噪声大的稀有 token → 重复增加）
-- κ=20 太严（过度过滤 → 损失多样性）
+- **审计修正**: 在当前公式 `m_i=m0+κ/sqrt(n_i+1)` 下，κ 越大 margin 越宽松；旧版“κ=5 太松 / κ=20 太严”的方向解释不成立。该表只能作为 legacy 观察，需在修复后的 sampler 上重跑后再解释。
 
 ### 4.3 论文定位
 
@@ -424,7 +437,7 @@ c_fit/c_true 的恢复比在 0.5-1.5 范围内，R² > 0.9。
 
 **目标**: 解决 ν-sampling 在 GSM8K 上准确率 (14%) 低于 top-p (16%) 的问题。
 
-**根因分析**: 通用语料频率表中，数学 token（数字、运算符）极低频 → κ/√(n_i+1) 很大 → 这些 token 被 ν-sampling 误杀。但数学推理中低频 token 往往是正确的。
+**审计修正**: 旧版根因分析把公式方向写反了。通用语料中数学 token 低频会让 `κ/√(n_i+1)` 更大，从而扩大保留 margin；这不会直接“误杀”低频 token。`nu_mathboost` 中 `combined_freq=max(general_freq, math_freq)` 会提高领域高频 token 的有效计数，从而收缩其不确定性 margin。该机制更合理的解释是 domain evidence 提高可估计性与 precision，而不是拯救被惩罚的低频 token。
 
 ### 7.1 三种修复方案对比
 
@@ -441,7 +454,7 @@ nu_mathboost ★        0.180    0.9195    0.0190    +0.020   ★ FIXED
 
 ### 7.2 最优方案: ν + Math-Boosted Frequency Table
 
-**核心思路**: 构建领域感知频率表 — 在通用语料基础上混入数学文本的 token 频率，使数学相关 token（数字、运算符）不被误判为"极稀有"。
+**核心思路（审计后解释）**: 构建领域感知频率表 — 在通用语料基础上混入数学文本的 token 频率，使数学相关 token（数字、运算符）被视为领域内更可估计，从而收缩这些 token 的不确定性 margin。
 
 ```python
 # 混入数学领域 token 频率
@@ -450,8 +463,8 @@ math_token_ids = tokenizer.encode(" ".join(math_texts))
 combined_freq = max(general_freq, math_freq)  # 取最大值
 ```
 
-**🎉 效果:**
-- **GSM8K: 18% ≥ top-p (16%)** — 推理准确率超越 top-p
+**Legacy 效果（需修复后重跑）:**
+- **GSM8K: 18% ≥ top-p (16%)** — 该结果来自修复前 generation/sampler 代码，只能作为待复验观察
 - **Distinct-2: 0.920** — 多样性保持与原版一致
 - **Trigram Rep: 0.019** — 远优于 top-p (0.030)
 

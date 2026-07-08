@@ -15,12 +15,12 @@ import argparse, json, os, time, re
 from collections import Counter
 import numpy as np
 import torch
-import torch.nn.functional as F
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from data_utils import load_model_and_tokenizer
+from samplers import batch_generate
 
 
 def parse_args():
@@ -119,98 +119,6 @@ CREATIVE_PROMPTS = [
     "Write about a window that looks out onto different centuries.",
     "Describe a piano that plays the emotions of whoever sits at it.",
 ]
-
-
-# ══════════════════════════════════════════════════════════════
-#  Truncation Strategies
-# ══════════════════════════════════════════════════════════════
-
-def apply_truncation(logits, strategy, token_freq_table=None, **kwargs):
-    """Apply truncation to batched logits (B, V)."""
-    logits = logits.clone()
-    if strategy == "top_p":
-        p = kwargs.get("p", 0.95)
-        probs = F.softmax(logits, dim=-1)
-        sorted_probs, sorted_idx = probs.sort(dim=-1, descending=True)
-        cum_probs = sorted_probs.cumsum(dim=-1)
-        mask = cum_probs > p
-        mask[..., 0] = False
-        sorted_logits = logits.gather(-1, sorted_idx)
-        sorted_logits[mask] = float("-inf")
-        _, inv_idx = sorted_idx.sort(dim=-1)
-        logits = sorted_logits.gather(-1, inv_idx)
-    elif strategy == "top_nsigma":
-        n_sigma = kwargs.get("n_sigma", 2.0)
-        sigma = logits.std(dim=-1, keepdim=True)
-        s_max = logits.max(dim=-1, keepdim=True).values
-        keep = (s_max - logits) <= n_sigma * sigma
-        logits[~keep] = float("-inf")
-    elif strategy == "nu":
-        kappa = kwargs.get("kappa", 10.0)
-        m0 = kwargs.get("m0", 3.0)
-        s_max = logits.max(dim=-1, keepdim=True).values
-        n_i = token_freq_table.to(logits.device).float().unsqueeze(0).expand_as(logits)
-        margin = m0 + kappa / torch.sqrt(n_i + 1)
-        keep = (s_max - logits) <= margin
-        logits[~keep] = float("-inf")
-    return logits
-
-
-@torch.no_grad()
-def batch_generate(model, tokenizer, prompt_texts, max_new_tokens, batch_size,
-                   strategy, strategy_kwargs, temperature=1.0):
-    """Batched KV-cache generation. Returns list of (text, token_ids)."""
-    device = next(model.parameters()).device
-    all_results = []
-
-    for batch_start in range(0, len(prompt_texts), batch_size):
-        batch_prompts = prompt_texts[batch_start:batch_start + batch_size]
-        B = len(batch_prompts)
-
-        enc = tokenizer(batch_prompts, return_tensors="pt", padding=True,
-                        truncation=True, max_length=100).to(device)
-        input_ids = enc["input_ids"]
-        attention_mask = enc["attention_mask"]
-        prompt_lens = attention_mask.sum(dim=-1).cpu().tolist()
-
-        generated = input_ids.clone()
-        gen_mask = attention_mask.clone()
-        past_key_values = None
-
-        for step in range(max_new_tokens):
-            if step == 0:
-                outputs = model(input_ids=generated, attention_mask=gen_mask,
-                                use_cache=True)
-            else:
-                outputs = model(input_ids=generated[:, -1:],
-                                attention_mask=gen_mask,
-                                past_key_values=past_key_values,
-                                use_cache=True)
-            past_key_values = outputs.past_key_values
-            next_logits = outputs.logits[:, -1, :] / temperature
-
-            if strategy == "greedy":
-                next_tokens = next_logits.argmax(dim=-1, keepdim=True)
-            else:
-                next_logits_trunc = apply_truncation(
-                    next_logits, strategy, **strategy_kwargs)
-                probs = F.softmax(next_logits_trunc, dim=-1)
-                for b in range(B):
-                    if probs[b].sum() < 0.5:
-                        probs[b] = F.softmax(outputs.logits[b, -1, :] / temperature, dim=-1)
-                next_tokens = torch.multinomial(probs, num_samples=1)
-
-            generated = torch.cat([generated, next_tokens], dim=-1)
-            gen_mask = torch.cat([gen_mask,
-                                 torch.ones(B, 1, device=device, dtype=gen_mask.dtype)], dim=-1)
-
-        for b in range(B):
-            plen = prompt_lens[b]
-            gen_ids = generated[b, plen:]
-            text = tokenizer.decode(gen_ids, skip_special_tokens=True)
-            all_results.append({"text": text, "tokens": gen_ids.cpu().tolist()})
-
-    return all_results
 
 
 # ══════════════════════════════════════════════════════════════
@@ -373,8 +281,7 @@ def main():
 
         # ── Task B: Creative ──
         creative_prompts_full = creative_prompts
-        if strat_name == "greedy":
-            torch.manual_seed(args.seed)
+        torch.manual_seed(args.seed)
         creative_gen = batch_generate(
             model, tokenizer, creative_prompts_full, args.max_new_tokens,
             args.batch_size, strat_config["strategy"], strat_config["kwargs"],

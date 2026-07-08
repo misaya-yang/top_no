@@ -3,9 +3,27 @@
 Research repository for the ICML 2027 draft:
 **Truncation Sampling as Hypothesis Testing**.
 
+## Current Status
+
+This repository has been patched for the first reproducibility audit:
+
+- Decoding experiments now share `experiments/samplers.py`.
+- `top_p` uses the standard nucleus rule and keeps the crossing token.
+- Batch generation uses left padding, EOS-aware stopping, and generated-token-only
+  metrics.
+- Logit-space truncation runs on raw logits; temperature is applied after
+  truncation for sampling.
+- Invalid truncated distributions now fail instead of silently falling back to
+  untruncated softmax.
+
+Existing files in `results/` were produced before these fixes. Treat them as
+legacy artifacts until the relevant experiments are rerun.
+
 ## Layout
 
 - `experiments/`: runnable experiment scripts and shared experiment utilities.
+- `experiments/samplers.py`: shared truncation and batch generation utilities.
+- `tests/`: lightweight sampler correctness tests.
 - `scripts/`: suite-level shell entrypoints.
 - `results/`: generated figures and JSON result artifacts.
 - `docs/reports/`: experiment writeups and summary reports.
@@ -52,4 +70,5 @@ expensive GPU experiments:
 ```bash
 python3 -m compileall experiments
 for script in scripts/*.sh; do bash -n "$script"; done
+python3 -m unittest discover tests
 ```

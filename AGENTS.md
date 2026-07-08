@@ -11,6 +11,9 @@ to change them.
 
 - `experiments/`: experiment scripts and shared helpers. Keep cross-experiment
   utilities here unless they become a reusable package.
+- `experiments/samplers.py`: shared sampler and batch generation implementation
+  for downstream decoding experiments.
+- `tests/`: lightweight correctness checks for sampler behavior.
 - `scripts/`: shell entrypoints for running experiment suites from the repository
   root.
 - `results/`: generated figures, JSON results, and large transient checkpoints.
@@ -24,6 +27,8 @@ to change them.
   renames, or formatting-only rewrites.
 - Preserve existing public surfaces: CLI flags, output filenames, result schema,
   and figure names.
+- Treat `results/` artifacts as legacy unless they were regenerated after the
+  latest sampler/generation changes.
 - Do not add dependencies unless the task requires it; if adding one, explain why
   and update `requirements.txt`.
 - Keep secrets, API keys, tokens, and local credentials out of files, logs, and
@@ -42,6 +47,21 @@ PYTHONPATH="$PWD/experiments" python3 experiments/<experiment>.py --output-dir .
 Most full experiments are GPU/model-cache dependent. The suite scripts default
 to offline Hugging Face mode for the current GPU server workflow.
 
+## Local Environment
+
+- Preferred local Torch smoke-test environment:
+  `/Users/misaya.yanghejazfs.com.au/miniconda3/envs/ai_gateway/bin/python`
+- Verified on 2026-07-08: Python 3.12.12, torch 2.9.1, CUDA unavailable, MPS
+  available.
+- Use this environment for lightweight sampler tests on this Mac:
+
+```bash
+/Users/misaya.yanghejazfs.com.au/miniconda3/envs/ai_gateway/bin/python -m unittest discover tests
+```
+
+The full model experiments still require the expected model cache and enough
+GPU/MPS memory; do not infer paper numbers from smoke tests.
+
 ## Verification
 
 Before calling work done, run the strongest check that fits the change:
@@ -49,6 +69,7 @@ Before calling work done, run the strongest check that fits the change:
 ```bash
 python3 -m compileall experiments
 for script in scripts/*.sh; do bash -n "$script"; done
+python3 -m unittest discover tests
 ```
 
 For behavior changes, also run the smallest relevant experiment or a reduced
