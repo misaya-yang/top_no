@@ -1,0 +1,21 @@
+{
+  "model": "Qwen/Qwen2.5-3B",
+  "datasets": ["writingprompts", "alpacaeval_creative"],
+  "n_prompts": 300,
+  "samples_per_prompt": 4,
+  "batch_size": 8,
+  "max_new_tokens": 256,
+  "temperature": 0.9,
+  "seed": 42,
+  "dtype": "float16",
+  "device": "cuda",
+  "output_dir": "./results/openended_quality_qwen3b",
+  "trust_remote_code": true,
+  "prediction_set_metrics": "./results/prediction_sets_qwen3b_wikitext/prediction_set_metrics.json",
+  "count_dataset": "wikitext",
+  "count_split": "validation",
+  "count_n_texts": 2000,
+  "count_max_length": 256,
+  "compute_perplexity": true,
+  "perplexity_max_length": 256
+}

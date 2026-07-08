@@ -1,0 +1,50 @@
+{
+  "model": "gpt2",
+  "dataset": "wikitext",
+  "n_positions": 64,
+  "q_hat": 2.772369384765625,
+  "methods": {
+    "top_k_50": {
+      "coverage": 0.65625,
+      "avg_set_size": 50.0,
+      "median_set_size": 50.0,
+      "avg_retained_mass": 0.7068989276885986
+    },
+    "top_p_0.95": {
+      "coverage": 0.9375,
+      "avg_set_size": 2638.609375,
+      "median_set_size": 1072.0,
+      "avg_retained_mass": 0.9536809325218201
+    },
+    "min_p_0.05": {
+      "coverage": 0.5625,
+      "avg_set_size": 18.671875,
+      "median_set_size": 10.0,
+      "avg_retained_mass": 0.6199664175510406
+    },
+    "fixed_margin_3": {
+      "coverage": 0.5625,
+      "avg_set_size": 18.78125,
+      "median_set_size": 10.0,
+      "avg_retained_mass": 0.6204991042613983
+    },
+    "top_nsigma_2": {
+      "coverage": 0.875,
+      "avg_set_size": 443.140625,
+      "median_set_size": 158.0,
+      "avg_retained_mass": 0.8314383327960968
+    },
+    "nu_k10_m3": {
+      "coverage": 0.921875,
+      "avg_set_size": 14887.015625,
+      "median_set_size": 10577.0,
+      "avg_retained_mass": 0.9966901987791061
+    },
+    "conformal_nu_k10_delta0.05": {
+      "coverage": 0.890625,
+      "avg_set_size": 13982.375,
+      "median_set_size": 9570.0,
+      "avg_retained_mass": 0.9959924817085266
+    }
+  }
+}

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$REPO_ROOT"
+
+PYTHON_BIN="${PYTHON_BIN:-python}"
+export PYTHONPATH="$REPO_ROOT/experiments:${PYTHONPATH:-}"
+
+"$PYTHON_BIN" experiments/eval_openended_quality.py \
+  --config configs/openended_quality_qwen3b.json

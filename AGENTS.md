@@ -38,6 +38,8 @@ to change them.
 
 - Main suite: `bash scripts/run_all.sh`
 - Supplementary suite: `bash scripts/run_supplementary.sh`
+- V2 prediction-set smoke: `bash scripts/run_prediction_sets_smoke.sh`
+- V2 GPU queue: `PYTHON_BIN=python bash scripts/run_icml2027_gpu_queue.sh`
 - Single experiment:
 
 ```bash
@@ -46,6 +48,8 @@ PYTHONPATH="$PWD/experiments" python3 experiments/<experiment>.py --output-dir .
 
 Most full experiments are GPU/model-cache dependent. The suite scripts default
 to offline Hugging Face mode for the current GPU server workflow.
+The V2 GPU queue runs the prediction-set experiment first and stops before
+downstream generation if `experiments/check_prediction_set_gate.py` fails.
 
 ## Local Environment
 

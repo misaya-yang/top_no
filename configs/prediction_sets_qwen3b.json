@@ -1,0 +1,18 @@
+{
+  "model": "Qwen/Qwen2.5-3B",
+  "dataset": "wikitext",
+  "split": "validation",
+  "n_calibration": 5000,
+  "n_eval": 20000,
+  "max_length": 256,
+  "batch_size": 8,
+  "position_batch_size": 256,
+  "kappa": 10.0,
+  "alpha": 1.0,
+  "delta": 0.05,
+  "seed": 42,
+  "dtype": "float16",
+  "device": "cuda",
+  "output_dir": "./results/prediction_sets_qwen3b_wikitext",
+  "trust_remote_code": true
+}

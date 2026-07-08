@@ -1,0 +1,508 @@
+{
+  "model": "gpt2",
+  "dataset": "wikitext",
+  "split": "validation",
+  "n_positions": 64,
+  "n_calibration": 64,
+  "n_eval": 64,
+  "q_hat": 2.772369384765625,
+  "kappa": 10.0,
+  "alpha": 1.0,
+  "delta": 0.05,
+  "elapsed_sec": 9.844929933547974,
+  "methods": {
+    "top_k_50": {
+      "coverage": 0.65625,
+      "avg_set_size": 50.0,
+      "median_set_size": 50.0,
+      "set_size_quantiles": {
+        "10": 50.0,
+        "25": 50.0,
+        "50": 50.0,
+        "75": 50.0,
+        "90": 50.0,
+        "95": 50.0,
+        "99": 50.0
+      },
+      "set_size_histogram": {
+        "upper_bounds": [
+          1,
+          10,
+          50,
+          100,
+          500,
+          1000,
+          5000,
+          10000,
+          50000
+        ],
+        "counts": [
+          0,
+          0,
+          64,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "avg_retained_mass": 0.7068989276885986,
+      "bucket_summary": {
+        "0": {
+          "n": 0,
+          "coverage": null,
+          "avg_set_size": null
+        },
+        "1-2": {
+          "n": 37,
+          "coverage": 0.6486486486486487,
+          "avg_set_size": 50.0
+        },
+        "3-10": {
+          "n": 19,
+          "coverage": 0.6842105263157895,
+          "avg_set_size": 50.0
+        },
+        "11-100": {
+          "n": 8,
+          "coverage": 0.625,
+          "avg_set_size": 50.0
+        },
+        ">100": {
+          "n": 0,
+          "coverage": null,
+          "avg_set_size": null
+        }
+      },
+      "config": {
+        "k": 50
+      }
+    },
+    "top_p_0.95": {
+      "coverage": 0.9375,
+      "avg_set_size": 2638.609375,
+      "median_set_size": 1072.0,
+      "set_size_quantiles": {
+        "10": 2.3000000000000007,
+        "25": 163.75,
+        "50": 1072.0,
+        "75": 3526.25,
+        "90": 5866.800000000001,
+        "95": 9512.64999999999,
+        "99": 18144.229999999985
+      },
+      "set_size_histogram": {
+        "upper_bounds": [
+          1,
+          10,
+          50,
+          100,
+          500,
+          1000,
+          5000,
+          10000,
+          50000
+        ],
+        "counts": [
+          4,
+          5,
+          3,
+          4,
+          7,
+          7,
+          25,
+          7,
+          2,
+          0
+        ]
+      },
+      "avg_retained_mass": 0.9536809325218201,
+      "bucket_summary": {
+        "0": {
+          "n": 0,
+          "coverage": null,
+          "avg_set_size": null
+        },
+        "1-2": {
+          "n": 37,
+          "coverage": 0.9459459459459459,
+          "avg_set_size": 2768.2162162162163
+        },
+        "3-10": {
+          "n": 19,
+          "coverage": 0.8947368421052632,
+          "avg_set_size": 2766.2631578947367
+        },
+        "11-100": {
+          "n": 8,
+          "coverage": 1.0,
+          "avg_set_size": 1736.0
+        },
+        ">100": {
+          "n": 0,
+          "coverage": null,
+          "avg_set_size": null
+        }
+      },
+      "config": {
+        "p": 0.95
+      }
+    },
+    "min_p_0.05": {
+      "coverage": 0.5625,
+      "avg_set_size": 18.671875,
+      "median_set_size": 10.0,
+      "set_size_quantiles": {
+        "10": 1.0,
+        "25": 3.0,
+        "50": 10.0,
+        "75": 29.25,
+        "90": 50.80000000000001,
+        "95": 58.69999999999999,
+        "99": 71.02999999999994
+      },
+      "set_size_histogram": {
+        "upper_bounds": [
+          1,
+          10,
+          50,
+          100,
+          500,
+          1000,
+          5000,
+          10000,
+          50000
+        ],
+        "counts": [
+          9,
+          25,
+          23,
+          7,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "avg_retained_mass": 0.6199664175510406,
+      "bucket_summary": {
+        "0": {
+          "n": 0,
+          "coverage": null,
+          "avg_set_size": null
+        },
+        "1-2": {
+          "n": 37,
+          "coverage": 0.5405405405405406,
+          "avg_set_size": 21.27027027027027
+        },
+        "3-10": {
+          "n": 19,
+          "coverage": 0.631578947368421,
+          "avg_set_size": 15.052631578947368
+        },
+        "11-100": {
+          "n": 8,
+          "coverage": 0.5,
+          "avg_set_size": 15.25
+        },
+        ">100": {
+          "n": 0,
+          "coverage": null,
+          "avg_set_size": null
+        }
+      },
+      "config": {
+        "p_min": 0.05
+      }
+    },
+    "fixed_margin_3": {
+      "coverage": 0.5625,
+      "avg_set_size": 18.78125,
+      "median_set_size": 10.0,
+      "set_size_quantiles": {
+        "10": 1.0,
+        "25": 3.0,
+        "50": 10.0,
+        "75": 29.25,
+        "90": 51.500000000000014,
+        "95": 58.69999999999999,
+        "99": 71.39999999999995
+      },
+      "set_size_histogram": {
+        "upper_bounds": [
+          1,
+          10,
+          50,
+          100,
+          500,
+          1000,
+          5000,
+          10000,
+          50000
+        ],
+        "counts": [
+          9,
+          25,
+          23,
+          7,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "avg_retained_mass": 0.6204991042613983,
+      "bucket_summary": {
+        "0": {
+          "n": 0,
+          "coverage": null,
+          "avg_set_size": null
+        },
+        "1-2": {
+          "n": 37,
+          "coverage": 0.5405405405405406,
+          "avg_set_size": 21.35135135135135
+        },
+        "3-10": {
+          "n": 19,
+          "coverage": 0.631578947368421,
+          "avg_set_size": 15.210526315789474
+        },
+        "11-100": {
+          "n": 8,
+          "coverage": 0.5,
+          "avg_set_size": 15.375
+        },
+        ">100": {
+          "n": 0,
+          "coverage": null,
+          "avg_set_size": null
+        }
+      },
+      "config": {
+        "margin": 3.0
+      }
+    },
+    "top_nsigma_2": {
+      "coverage": 0.875,
+      "avg_set_size": 443.140625,
+      "median_set_size": 158.0,
+      "set_size_quantiles": {
+        "10": 3.0,
+        "25": 24.5,
+        "50": 158.0,
+        "75": 399.75,
+        "90": 1273.1000000000006,
+        "95": 2476.0999999999995,
+        "99": 3005.019999999998
+      },
+      "set_size_histogram": {
+        "upper_bounds": [
+          1,
+          10,
+          50,
+          100,
+          500,
+          1000,
+          5000,
+          10000,
+          50000
+        ],
+        "counts": [
+          2,
+          11,
+          7,
+          7,
+          25,
+          3,
+          9,
+          0,
+          0,
+          0
+        ]
+      },
+      "avg_retained_mass": 0.8314383327960968,
+      "bucket_summary": {
+        "0": {
+          "n": 0,
+          "coverage": null,
+          "avg_set_size": null
+        },
+        "1-2": {
+          "n": 37,
+          "coverage": 0.918918918918919,
+          "avg_set_size": 673.4324324324324
+        },
+        "3-10": {
+          "n": 19,
+          "coverage": 0.7894736842105263,
+          "avg_set_size": 128.3684210526316
+        },
+        "11-100": {
+          "n": 8,
+          "coverage": 0.875,
+          "avg_set_size": 125.625
+        },
+        ">100": {
+          "n": 0,
+          "coverage": null,
+          "avg_set_size": null
+        }
+      },
+      "config": {
+        "n_sigma": 2.0
+      }
+    },
+    "nu_k10_m3": {
+      "coverage": 0.921875,
+      "avg_set_size": 14887.015625,
+      "median_set_size": 10577.0,
+      "set_size_quantiles": {
+        "10": 841.0000000000001,
+        "25": 5443.75,
+        "50": 10577.0,
+        "75": 22449.25,
+        "90": 32918.100000000006,
+        "95": 42520.799999999996,
+        "99": 49767.2
+      },
+      "set_size_histogram": {
+        "upper_bounds": [
+          1,
+          10,
+          50,
+          100,
+          500,
+          1000,
+          5000,
+          10000,
+          50000
+        ],
+        "counts": [
+          0,
+          1,
+          1,
+          0,
+          2,
+          4,
+          6,
+          13,
+          37,
+          0
+        ]
+      },
+      "avg_retained_mass": 0.9966901987791061,
+      "bucket_summary": {
+        "0": {
+          "n": 0,
+          "coverage": null,
+          "avg_set_size": null
+        },
+        "1-2": {
+          "n": 37,
+          "coverage": 0.972972972972973,
+          "avg_set_size": 15566.432432432432
+        },
+        "3-10": {
+          "n": 19,
+          "coverage": 0.8421052631578947,
+          "avg_set_size": 14849.105263157895
+        },
+        "11-100": {
+          "n": 8,
+          "coverage": 0.875,
+          "avg_set_size": 11834.75
+        },
+        ">100": {
+          "n": 0,
+          "coverage": null,
+          "avg_set_size": null
+        }
+      },
+      "config": {
+        "kappa": 10.0,
+        "m0": 3.0
+      }
+    },
+    "conformal_nu_k10_delta0.05": {
+      "coverage": 0.890625,
+      "avg_set_size": 13982.375,
+      "median_set_size": 9570.0,
+      "set_size_quantiles": {
+        "10": 710.3000000000001,
+        "25": 4861.25,
+        "50": 9570.0,
+        "75": 20837.75,
+        "90": 31448.300000000007,
+        "95": 41096.19999999999,
+        "99": 49597.72
+      },
+      "set_size_histogram": {
+        "upper_bounds": [
+          1,
+          10,
+          50,
+          100,
+          500,
+          1000,
+          5000,
+          10000,
+          50000
+        ],
+        "counts": [
+          0,
+          2,
+          0,
+          0,
+          3,
+          3,
+          10,
+          15,
+          31,
+          0
+        ]
+      },
+      "avg_retained_mass": 0.9959924817085266,
+      "bucket_summary": {
+        "0": {
+          "n": 0,
+          "coverage": null,
+          "avg_set_size": null
+        },
+        "1-2": {
+          "n": 37,
+          "coverage": 0.9459459459459459,
+          "avg_set_size": 14654.378378378378
+        },
+        "3-10": {
+          "n": 19,
+          "coverage": 0.7894736842105263,
+          "avg_set_size": 13900.315789473685
+        },
+        "11-100": {
+          "n": 8,
+          "coverage": 0.875,
+          "avg_set_size": 11069.25
+        },
+        ">100": {
+          "n": 0,
+          "coverage": null,
+          "avg_set_size": null
+        }
+      },
+      "config": {
+        "kappa": 10.0,
+        "q_hat": 2.772369384765625,
+        "alpha": 1.0
+      }
+    }
+  }
+}

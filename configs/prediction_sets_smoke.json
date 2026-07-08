@@ -1,0 +1,18 @@
+{
+  "model": "gpt2",
+  "dataset": "wikitext",
+  "split": "validation",
+  "n_calibration": 64,
+  "n_eval": 64,
+  "max_length": 64,
+  "batch_size": 2,
+  "position_batch_size": 128,
+  "kappa": 10.0,
+  "alpha": 1.0,
+  "delta": 0.05,
+  "seed": 42,
+  "dtype": "auto",
+  "device": "auto",
+  "output_dir": "./results/smoke_prediction_sets",
+  "trust_remote_code": true
+}

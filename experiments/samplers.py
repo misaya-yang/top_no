@@ -50,17 +50,37 @@ def _nu_margin(
     return m0 + kappa / torch.sqrt(n_i + 1)
 
 
-def apply_truncation(
+def get_keep_mask(
     logits: torch.Tensor,
     strategy: str,
     token_freq_table: torch.Tensor | None = None,
     **kwargs: Any,
 ) -> torch.Tensor:
-    """Apply a truncation rule to batched raw logits of shape (B, V)."""
-    logits = logits.clone()
+    """Return the boolean candidate-set mask for batched raw logits."""
+    if strategy == "greedy":
+        keep = torch.zeros_like(logits, dtype=torch.bool)
+        keep.scatter_(-1, logits.argmax(dim=-1, keepdim=True), True)
 
-    if strategy == "top_p":
+    elif strategy == "top_k":
+        k = max(int(kwargs.get("k", 50)), 1)
+        k = min(k, logits.shape[-1])
+        top_values, _ = logits.topk(k, dim=-1)
+        threshold = top_values[..., -1:].expand_as(logits)
+        keep = logits >= threshold
+
+    elif strategy == "top_p":
         keep = _top_p_keep_mask(logits, kwargs.get("p", 0.95))
+
+    elif strategy == "min_p":
+        p_min = kwargs.get("p_min", 0.05)
+        probs = F.softmax(logits, dim=-1)
+        p_max = probs.max(dim=-1, keepdim=True).values
+        keep = probs >= p_min * p_max
+
+    elif strategy == "fixed_margin":
+        margin = kwargs.get("margin", 3.0)
+        s_max = logits.max(dim=-1, keepdim=True).values
+        keep = (s_max - logits) <= margin
 
     elif strategy == "top_nsigma":
         n_sigma = kwargs.get("n_sigma", 2.0)
@@ -73,6 +93,19 @@ def apply_truncation(
         s_max = logits.max(dim=-1, keepdim=True).values
         margin = _nu_margin(logits, freqs, kwargs.get("kappa", 10.0), kwargs.get("m0", 3.0))
         keep = (s_max - logits) <= margin
+
+    elif strategy == "conformal_nu":
+        freqs = _require_token_freq(token_freq_table, strategy)
+        if "q_hat" not in kwargs:
+            raise ValueError("conformal_nu requires q_hat")
+        kappa = kwargs.get("kappa", 10.0)
+        alpha = kwargs.get("alpha", 1.0)
+        if alpha <= 0:
+            raise ValueError("alpha must be positive")
+        s_max = logits.max(dim=-1, keepdim=True).values
+        n_i = freqs.to(logits.device).float().unsqueeze(0).expand_as(logits)
+        nonconformity = s_max - logits - kappa / torch.sqrt(n_i + alpha)
+        keep = nonconformity <= float(kwargs["q_hat"])
 
     elif strategy == "nu_topp_floor":
         freqs = _require_token_freq(token_freq_table, strategy)
@@ -112,6 +145,18 @@ def apply_truncation(
     else:
         raise ValueError(f"Unknown truncation strategy: {strategy}")
 
+    return keep
+
+
+def apply_truncation(
+    logits: torch.Tensor,
+    strategy: str,
+    token_freq_table: torch.Tensor | None = None,
+    **kwargs: Any,
+) -> torch.Tensor:
+    """Apply a truncation rule to batched raw logits of shape (B, V)."""
+    logits = logits.clone()
+    keep = get_keep_mask(logits, strategy, token_freq_table=token_freq_table, **kwargs)
     logits[~keep] = float("-inf")
     return logits
 

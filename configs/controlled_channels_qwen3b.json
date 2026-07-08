@@ -1,0 +1,16 @@
+{
+  "model": "Qwen/Qwen2.5-3B",
+  "dataset": "wikitext",
+  "split": "validation",
+  "n_texts": 512,
+  "max_length": 128,
+  "batch_size": 4,
+  "channels": ["hidden_noise", "dropout"],
+  "noise_sigma": 0.01,
+  "n_perturbations": 4,
+  "seed": 42,
+  "dtype": "float16",
+  "device": "cuda",
+  "output_dir": "./results/controlled_channels_qwen3b",
+  "trust_remote_code": true
+}

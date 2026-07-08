@@ -1,0 +1,17 @@
+{
+  "passed": false,
+  "conformal_method": "conformal_nu_k10_delta0.05",
+  "target_coverage": 0.95,
+  "coverage_tolerance": 0.02,
+  "criterion_fixed_coverage": false,
+  "criterion_matched_support": false,
+  "covered_baselines": [
+    "top_p_0.95"
+  ],
+  "matched_support_comparisons": [],
+  "conformal": {
+    "coverage": 0.890625,
+    "avg_set_size": 13982.375,
+    "low_frequency_coverage": 0.9459459459459459
+  }
+}

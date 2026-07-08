@@ -62,6 +62,47 @@ Run one experiment directly from the repository root:
 PYTHONPATH="$PWD/experiments" python3 experiments/exp1_topk_bias.py --output-dir ./results
 ```
 
+Run the local prediction-set smoke test with the verified conda Torch
+environment:
+
+```bash
+bash scripts/run_prediction_sets_smoke.sh
+```
+
+Run the rented-GPU Qwen2.5-3B prediction-set experiment:
+
+```bash
+PYTHON_BIN=python bash scripts/run_prediction_sets_qwen3b.sh
+```
+
+Plot prediction-set figures and run the decision gate:
+
+```bash
+PYTHON_BIN=python bash scripts/run_prediction_set_plots.sh
+python experiments/check_prediction_set_gate.py --metrics results/prediction_sets_qwen3b_wikitext/prediction_set_metrics.json
+```
+
+Run the full GPU queue. This stops after the prediction-set gate if the core
+signal is not strong enough for downstream generation experiments:
+
+```bash
+PYTHON_BIN=python bash scripts/run_icml2027_gpu_queue.sh
+```
+
+The prediction-set experiment writes:
+
+- `prediction_set_metrics.json`
+- `coverage_size_pareto.png`
+- `prediction_set_coverage_efficiency.png`
+- `prediction_set_bucket_coverage.png`
+- `prediction_set_distribution_summary.png`
+
+Downstream GPU scripts:
+
+- `scripts/run_reasoning_self_consistency_qwen3b.sh`: GSM8K, MATH-500, and SVAMP pass@k/maj@k evaluation.
+- `scripts/run_openended_quality_qwen3b.sh`: open-ended quality with self-BLEU, repetition, unique-token ratio, and perplexity.
+- `scripts/run_controlled_channels_qwen3b.sh`: controlled perturbation evidence by target-token frequency bucket.
+
 ## Lightweight Verification
 
 These checks verify the repository structure and syntax without rerunning the

@@ -55,6 +55,47 @@ class SamplerTests(unittest.TestCase):
         self.assertTrue(torch.isfinite(truncated[0, 1]))
         self.assertFalse(torch.isfinite(truncated[0, 2]))
 
+    def test_fixed_margin_matches_min_p_threshold(self):
+        logits = torch.tensor([[5.0, 2.0, 1.0]], dtype=torch.float32)
+
+        min_p = apply_truncation(logits, "min_p", p_min=math.exp(-3.0))
+        fixed = apply_truncation(logits, "fixed_margin", margin=3.0)
+
+        self.assertEqual(torch.isfinite(min_p).tolist(), torch.isfinite(fixed).tolist())
+
+    def test_nu_kappa_zero_matches_fixed_margin(self):
+        logits = torch.tensor([[5.0, 2.0, 1.0]], dtype=torch.float32)
+        freqs = torch.tensor([1.0, 1.0, 1.0], dtype=torch.float32)
+
+        nu = apply_truncation(logits, "nu", token_freq_table=freqs, kappa=0.0, m0=3.0)
+        fixed = apply_truncation(logits, "fixed_margin", margin=3.0)
+
+        self.assertEqual(torch.isfinite(nu).tolist(), torch.isfinite(fixed).tolist())
+
+    def test_top_k_keeps_requested_number_of_tokens(self):
+        logits = torch.tensor([[5.0, 2.0, 3.0, 1.0]], dtype=torch.float32)
+
+        truncated = apply_truncation(logits, "top_k", k=2)
+
+        self.assertEqual(torch.isfinite(truncated).sum().item(), 2)
+        self.assertTrue(torch.isfinite(truncated[0, 0]))
+        self.assertTrue(torch.isfinite(truncated[0, 2]))
+
+    def test_conformal_nu_uses_nonconformity_threshold(self):
+        logits = torch.tensor([[5.0, 2.0, 1.0]], dtype=torch.float32)
+        freqs = torch.tensor([100.0, 0.0, 10.0], dtype=torch.float32)
+
+        truncated = apply_truncation(
+            logits,
+            "conformal_nu",
+            token_freq_table=freqs,
+            kappa=1.0,
+            q_hat=2.0,
+            alpha=1.0,
+        )
+
+        self.assertEqual(torch.isfinite(truncated).tolist(), [[True, True, False]])
+
     def test_batch_generate_left_padding_position_ids_and_eos_slicing(self):
         class Encoding(dict):
             def to(self, device):
