@@ -113,6 +113,13 @@ C-margin, APS, signed C-nu, frequency-Mondrian margin, and entropy-Mondrian
 margin. Remaining mandatory methods, runner integration, tuning artifacts,
 per-document evidence, and suffstats remain blocked.
 
+PR-2c now defines a strict, content-addressed per-position gate-evidence
+contract. It binds canonical method calibration, frozen PR-1/config artifacts,
+model/domain identity, `[G]`/`[E]` position policy, and a shared ordered test-row
+hash. It can losslessly recompute coverage, mean size, and frequency-group
+summaries; evaluator emission, replay caches, and bootstrap inference are still
+pending.
+
 - Add `mondrian_quantiles`, score dithering, and a tuning path that reads
   `D_tune` only.
 - Complete `experiments/methods.py` for calibrated baselines: C-margin, C-logprob,

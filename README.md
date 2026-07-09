@@ -38,6 +38,9 @@ first calibrated prediction-set pipeline:
 - `experiments/methods.py` assigns canonical registry keys to every planned
   calibrated baseline and currently executes C-margin, APS, signed C-nu, and
   frequency-/entropy-Mondrian margin through one tensor-only interface.
+- `experiments/gate_evidence.py` defines the content-addressed per-position
+  `[G]`/`[E]` handoff needed for paired document-clustered gate inference;
+  aggregate legacy metrics cannot be loaded as this evidence type.
 - `top_p` uses the standard nucleus rule and keeps the crossing token.
 - Batch generation uses left padding, EOS-aware stopping, and generated-token-only
   metrics.
