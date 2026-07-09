@@ -69,7 +69,7 @@ def main() -> None:
             cache_dir=args.cache_dir,
             local_files_only=True,
         )
-        snapshot_dir = Path(tokenizer_config_path).resolve().parent
+        snapshot_dir = Path(tokenizer_config_path).absolute().parent
         if snapshot_dir.name != args.revision or snapshot_dir.parent.name != "snapshots":
             raise ValueError(
                 "tokenizer revision is unresolved: cached tokenizer_config.json "
