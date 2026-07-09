@@ -170,11 +170,13 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--output-dir", type=str, default=None)
     p.add_argument("--frequency-table", type=str, default=None)
     p.add_argument("--frequency-manifest", type=str, default=None)
+    p.add_argument("--frequency-document-jsonl", type=str, default=None)
     p.add_argument("--tune-manifest", type=str, default=None)
     p.add_argument("--calibration-manifest", type=str, default=None)
     p.add_argument("--test-manifest", type=str, default=None)
     p.add_argument("--split-receipt", type=str, default=None)
     p.add_argument("--document-jsonl", type=str, default=None)
+    p.add_argument("--cross-corpus-receipt", type=str, default=None)
     p.add_argument("--calibration-position-salt", type=str, default=None)
     p.add_argument("--test-position-salt", type=str, default=None)
     p.add_argument("--trust-remote-code", action="store_true")
@@ -214,11 +216,13 @@ def load_config(path: str | None) -> dict[str, Any]:
         "allow_legacy_protocol": False,
         "frequency_table": None,
         "frequency_manifest": None,
+        "frequency_document_jsonl": None,
         "tune_manifest": None,
         "calibration_manifest": None,
         "test_manifest": None,
         "split_receipt": None,
         "document_jsonl": None,
+        "cross_corpus_receipt": None,
         "calibration_position_salt": None,
         "test_position_salt": None,
     }

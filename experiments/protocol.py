@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from document_store import bind_split_documents
+from cross_corpus import validate_cross_corpus_audit
 from freq_table import (
     PROTOCOL_VERSION,
     load_frequency_table,
@@ -87,10 +87,10 @@ def _legacy_protocol(config: dict[str, Any]) -> dict[str, Any]:
 def validate_protocol_inputs(config: dict[str, Any]) -> dict[str, Any]:
     """Validate provenance before any model or dataset allocation.
 
-    PR-1a validates frequency artifacts, PR-1b provides split receipts, and
-    PR-1c binds those receipts to exact source text and document-aware forward
-    helpers. Non-legacy requests remain blocked until D_freq/evaluation
-    near-duplicate disjointness has its own joint or cross-corpus proof.
+    PR-1a validates frequency artifacts, PR-1b provides split receipts, PR-1c
+    binds those receipts to exact source text, and PR-1d recomputes a fixed
+    threshold-complete D_freq/evaluation near-duplicate proof. Non-legacy
+    requests remain blocked until the PR-2 conformal core and PR-3 gate land.
     """
     legacy_flag = config.get("allow_legacy_protocol", False)
     if not isinstance(legacy_flag, bool):
@@ -104,6 +104,8 @@ def validate_protocol_inputs(config: dict[str, Any]) -> dict[str, Any]:
         "model_revision",
         "split_receipt",
         "document_jsonl",
+        "frequency_document_jsonl",
+        "cross_corpus_receipt",
         "calibration_position_salt",
         "test_position_salt",
     ]
@@ -165,22 +167,45 @@ def validate_protocol_inputs(config: dict[str, Any]) -> dict[str, Any]:
             f"artifact={reference['source_manifest_sha256']!r} "
             f"manifest={frequency_manifest_hash!r}"
         )
+    if metadata.num_documents != len(manifests["freq"].documents):
+        raise ValueError(
+            "frequency table num_documents does not match frequency manifest: "
+            f"artifact={metadata.num_documents} "
+            f"manifest={len(manifests['freq'].documents)}"
+        )
 
-    bound_documents = bind_split_documents(
-        Path(config["split_receipt"]),
-        Path(config["document_jsonl"]),
-        configured_manifests={
+    cross_receipt = validate_cross_corpus_audit(
+        Path(config["cross_corpus_receipt"]),
+        frequency_manifest_path=Path(config["frequency_manifest"]),
+        frequency_document_jsonl=Path(config["frequency_document_jsonl"]),
+        evaluation_split_receipt_path=Path(config["split_receipt"]),
+        evaluation_document_jsonl=Path(config["document_jsonl"]),
+        configured_eval_manifests={
             "tune": Path(config["tune_manifest"]),
             "cal": Path(config["calibration_manifest"]),
             "test": Path(config["test_manifest"]),
         },
     )
-    if not bound_documents.for_role("cal") or not bound_documents.for_role("test"):
-        raise ValueError("calibration and test manifests must both be non-empty")
+    if cross_receipt.frequency_manifest_sha256 != frequency_manifest_hash:
+        raise ValueError("cross-corpus frequency manifest changed during validation")
+    if cross_receipt.frequency_document_count != metadata.num_documents:
+        raise ValueError(
+            "cross-corpus frequency document count does not match frequency table"
+        )
+    cross_role_hashes = {
+        "tune": cross_receipt.evaluation_tune_manifest_sha256,
+        "cal": cross_receipt.evaluation_cal_manifest_sha256,
+        "test": cross_receipt.evaluation_test_manifest_sha256,
+    }
+    for role in ("tune", "cal", "test"):
+        if cross_role_hashes[role] != manifest_sha256(manifests[role]):
+            raise ValueError(
+                f"cross-corpus evaluation manifest changed during validation: {role}"
+            )
 
     raise RuntimeError(
-        "blocked_pending_cross_corpus_cluster: frequency artifacts and evaluation "
-        "documents are individually bound, but D_freq and evaluation documents "
-        "do not yet share a joint cluster receipt or threshold-complete cross-corpus "
-        "near-duplicate proof. Paper-grade execution remains blocked."
+        "blocked_pending_pr2_pr3: PR-1 provenance, deterministic document splits, "
+        "exact text binding, and recomputed cross-corpus disjointness all passed, "
+        "but the conformal core/method registry and calibrated-vs-calibrated gate "
+        "are not yet complete. Paper-grade execution remains blocked."
     )

@@ -48,9 +48,12 @@ these fixes. Treat them as legacy artifacts until the relevant experiments are
 rerun under the calibrated protocol.
 
 Protocol blocker: the current prediction-set runner is intentionally blocked
-for paper-grade runs until the PR-1..PR-3 protocol repairs land. The legacy
-runner builds token counts from the loaded calibration/eval text pool and uses a
-sequential calibration/eval split, so its outputs are smoke-test artifacts only.
+for paper-grade runs until the PR-2 conformal core and PR-3 calibrated gate
+land. PR-1 now binds immutable frequency counts, deterministic document splits,
+exact source text, and a recomputed cross-corpus near-duplicate receipt. The
+legacy runner builds token counts from the loaded calibration/eval text pool and
+uses a sequential calibration/eval split, so its outputs are smoke-test
+artifacts only.
 
 ## Layout
 

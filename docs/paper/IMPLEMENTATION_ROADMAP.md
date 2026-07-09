@@ -6,20 +6,19 @@ The full external review is stored in
 
 ## Current Stop Condition
 
-No paper-grade GPU run should be launched until PR-1d through PR-3 are complete.
+No paper-grade GPU run should be launched until PR-2 and PR-3 are complete.
 PR-1a now provides immutable external frequency artifacts, PR-1b provides
 deterministic split construction receipts and position selectors, and PR-1c
-binds those artifacts to exact text and a prefix-only `[G]` forward helper. The
-normal `experiments/eval_prediction_sets.py` path remains blocked because:
+binds those artifacts to exact text and a prefix-only `[G]` forward helper.
+PR-1d adds a recomputed, threshold-complete cross-corpus disjointness proof.
+The normal `experiments/eval_prediction_sets.py` path remains blocked because:
 
-1. `D_freq` and evaluation near-duplicate disjointness lacks a joint or
-   cross-corpus construction proof;
-2. the calibrated methods registry and suffstats replay are not implemented;
-3. the current gate compares one calibrated method against mostly uncalibrated
+1. the calibrated methods registry and suffstats replay are not implemented;
+2. the current gate compares one calibrated method against mostly uncalibrated
    baselines.
 
 The runner refuses nonlegacy execution with
-`blocked_pending_cross_corpus_cluster` before model allocation. Explicit
+`blocked_pending_pr2_pr3` before model allocation. Explicit
 `allow_legacy_protocol=true` retains the old sequential path only for
 noncitable smoke tests.
 
@@ -71,17 +70,23 @@ Status: exact text binding and the lower-level `[G]` forward are complete.
 
 ## PR-1d: Cross-Corpus Near-Duplicate Proof
 
-- Build a joint four-way construction receipt or a threshold-complete
-  cross-corpus disjointness receipt binding the frequency manifest and eval
-  split receipt.
-- Rebuild the frequency manifest/table if cross-corpus clustering changes the
-  retained `D_freq` documents.
-- Keep normal nonlegacy execution at `blocked_pending_cross_corpus_cluster`
-  until this proof exists. Even then, PR-2/PR-3 are required for paper evidence.
+Status: complete in code; paper execution remains fail-closed.
+
+- The audit compares every frequency-manifest document against the union of the
+  canonical tune/cal/test representatives.
+- Candidate generation unions deterministic MinHash-LSH with the
+  threshold-complete prefix index; exact integer `5I >= 4U` confirmation fixes
+  the paper threshold at Jaccard `>= 0.8` over normalized 13-token shingles.
+- The receipt binds both source JSONLs, the frequency manifest, the split
+  receipt and role manifests, all algorithm parameters, candidate/exact counts,
+  the comparison transcript, and the zero-match verdict.
+- Protocol validation loads the saved receipt and independently recomputes the
+  full audit before advancing to `blocked_pending_pr2_pr3`.
+- Frequency-table `num_documents` must equal the bound frequency manifest.
 
 Required tests: disjoint manifest tripwire, one-position-per-document
 determinism, exact receipt/text binding, and refusal on count/eval near-duplicate
-intersection.
+intersection. These are covered by the PR-1a through PR-1d tests.
 
 ## PR-2: Conformal Core And Methods Registry
 

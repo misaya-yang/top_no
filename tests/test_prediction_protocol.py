@@ -17,6 +17,7 @@ except ModuleNotFoundError:
     torch = None
 
 if torch is not None:
+    from cross_corpus import audit_cross_corpus, save_cross_corpus_audit  # noqa: E402
     from eval_prediction_sets import (  # noqa: E402
         assert_protocol_is_allowed,
         load_config,
@@ -42,6 +43,7 @@ if torch is not None:
         ManifestDocument,
         SourceDocument,
         build_split_artifacts,
+        content_sha256,
         manifest_sha256,
         save_manifest,
         save_split_artifacts,
@@ -74,7 +76,9 @@ class PredictionProtocolTests(unittest.TestCase):
         )
         return save_manifest(manifest, self.root / f"{role}.json"), manifest
 
-    def write_frequency_table(self, frequency_manifest, source_hash=None):
+    def write_frequency_table(
+        self, frequency_manifest, source_hash=None, num_documents=None
+    ):
         counts = torch.tensor([4, 0, 7], dtype=torch.int64)
         metadata = make_frequency_table_metadata(
             counts,
@@ -83,12 +87,41 @@ class PredictionProtocolTests(unittest.TestCase):
             tokenizer_revision="model-commit",
             source_manifest_sha256=source_hash or manifest_sha256(frequency_manifest),
             exclusion_token_ids=(1,),
-            num_documents=1,
+            num_documents=(
+                len(frequency_manifest.documents)
+                if num_documents is None
+                else num_documents
+            ),
         )
         return save_frequency_table(counts, metadata, self.root / "frequency-table")
 
     def complete_config(self):
-        frequency_path, frequency = self.write_manifest("freq", "freq")
+        frequency_document = SourceDocument(
+            "freq-doc-0",
+            " ".join(f"frequency-corpus-token-{index}" for index in range(40)),
+        )
+        frequency = DocumentManifest(
+            protocol_version="icml2027-pr1a",
+            role="freq",
+            source="fixture-frequency",
+            documents=(
+                ManifestDocument(
+                    doc_id=frequency_document.doc_id,
+                    content_sha256=content_sha256(frequency_document.text),
+                    cluster_id=hashlib.sha256(b"freq-cluster-0").hexdigest(),
+                ),
+            ),
+        )
+        frequency_path = save_manifest(
+            frequency, self.root / "paper-frequency-manifest.json"
+        )
+        frequency_document_path = self.root / "frequency-documents.jsonl"
+        frequency_document_path.write_text(
+            json.dumps(
+                {"doc_id": frequency_document.doc_id, "text": frequency_document.text}
+            )
+            + "\n"
+        )
         documents = tuple(
             SourceDocument(
                 f"eval-doc-{index}",
@@ -117,16 +150,28 @@ class PredictionProtocolTests(unittest.TestCase):
             + "\n"
         )
         table_path = self.write_frequency_table(frequency)
+        cross_audit = audit_cross_corpus(
+            frequency_manifest_path=frequency_path,
+            frequency_document_jsonl=frequency_document_path,
+            evaluation_split_receipt_path=receipt_path,
+            evaluation_document_jsonl=document_path,
+        )
+        self.assertEqual(cross_audit.receipt.verdict, "pass")
+        cross_receipt_path = save_cross_corpus_audit(
+            cross_audit, self.root / "cross-corpus-receipt.json"
+        )
         return {
             "allow_legacy_protocol": False,
             "model_revision": "model-commit",
             "frequency_table": str(table_path),
             "frequency_manifest": str(frequency_path),
+            "frequency_document_jsonl": str(frequency_document_path),
             "tune_manifest": str(receipt_path.parent / "tune_manifest.json"),
             "calibration_manifest": str(receipt_path.parent / "cal_manifest.json"),
             "test_manifest": str(receipt_path.parent / "test_manifest.json"),
             "split_receipt": str(receipt_path),
             "document_jsonl": str(document_path),
+            "cross_corpus_receipt": str(cross_receipt_path),
             "calibration_position_salt": "fixture-calibration-salt",
             "test_position_salt": "fixture-test-salt",
         }
@@ -161,11 +206,13 @@ class PredictionProtocolTests(unittest.TestCase):
         self.assertIsNone(config["model_revision"])
         self.assertIsNone(config["frequency_table"])
         self.assertIsNone(config["frequency_manifest"])
+        self.assertIsNone(config["frequency_document_jsonl"])
         self.assertIsNone(config["tune_manifest"])
         self.assertIsNone(config["calibration_manifest"])
         self.assertIsNone(config["test_manifest"])
         self.assertIsNone(config["split_receipt"])
         self.assertIsNone(config["document_jsonl"])
+        self.assertIsNone(config["cross_corpus_receipt"])
         self.assertIsNone(config["calibration_position_salt"])
         self.assertIsNone(config["test_position_salt"])
 
@@ -238,15 +285,26 @@ class PredictionProtocolTests(unittest.TestCase):
     def test_nonlegacy_protocol_lists_missing_inputs(self):
         with self.assertRaisesRegex(
             RuntimeError,
-            "frequency_table.*frequency_manifest.*tune_manifest.*calibration_manifest.*test_manifest.*split_receipt.*document_jsonl.*calibration_position_salt.*test_position_salt",
+            "frequency_table.*frequency_manifest.*tune_manifest.*calibration_manifest.*test_manifest.*split_receipt.*document_jsonl.*frequency_document_jsonl.*cross_corpus_receipt.*calibration_position_salt.*test_position_salt",
         ):
             validate_protocol_inputs({"allow_legacy_protocol": False})
 
-    def test_complete_inputs_advance_to_cross_corpus_cluster_block(self):
-        with self.assertRaisesRegex(RuntimeError, "blocked_pending_cross_corpus_cluster"):
+    def test_complete_inputs_advance_to_pr2_pr3_block(self):
+        with self.assertRaisesRegex(RuntimeError, "blocked_pending_pr2_pr3"):
             validate_protocol_inputs(self.complete_config())
 
-    def test_document_store_tampering_fails_before_cross_corpus_block(self):
+    def test_pr2_pr3_block_still_precedes_model_allocation(self):
+        config_path = self.root / "complete-config.json"
+        config_path.write_text(json.dumps(self.complete_config()))
+        with patch(
+            "sys.argv", ["eval_prediction_sets.py", "--config", str(config_path)]
+        ), patch("eval_prediction_sets.load_model_and_tokenizer") as mocked_load:
+            with self.assertRaisesRegex(RuntimeError, "blocked_pending_pr2_pr3"):
+                prediction_main()
+
+        mocked_load.assert_not_called()
+
+    def test_document_store_tampering_fails_before_pr2_pr3_block(self):
         config = self.complete_config()
         document_path = Path(config["document_jsonl"])
         rows = document_path.read_text().splitlines()
@@ -279,7 +337,7 @@ class PredictionProtocolTests(unittest.TestCase):
             def for_role(_role):
                 return ()
 
-        with patch("protocol.bind_split_documents", return_value=EmptyBound()):
+        with patch("cross_corpus.bind_split_documents", return_value=EmptyBound()):
             with self.assertRaisesRegex(ValueError, "calibration and test manifests"):
                 validate_protocol_inputs(self.complete_config())
 
@@ -291,7 +349,7 @@ class PredictionProtocolTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "role mismatch.*cal"):
             validate_protocol_inputs(config)
 
-    def test_manifest_intersection_fails_before_cross_corpus_block(self):
+    def test_manifest_intersection_fails_before_pr2_pr3_block(self):
         config = self.complete_config()
         frequency = json.loads(Path(config["frequency_manifest"]).read_text())
         test = json.loads(Path(config["test_manifest"]).read_text())
@@ -451,13 +509,40 @@ class PredictionProtocolTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "allow_legacy_protocol.*boolean"):
                     validate_protocol_inputs({"allow_legacy_protocol": value})
 
-    def test_nonlegacy_validates_counts_payload_before_cross_corpus_block(self):
+    def test_nonlegacy_validates_counts_payload_before_pr2_pr3_block(self):
         config = self.complete_config()
         sidecar = Path(config["frequency_table"])
         payload = json.loads(sidecar.read_text())
         (sidecar.parent / payload["counts_file"]).unlink()
 
         with self.assertRaisesRegex(ValueError, "counts file is missing"):
+            validate_protocol_inputs(config)
+
+    def test_frequency_table_document_count_must_match_manifest(self):
+        config = self.complete_config()
+        frequency_payload = json.loads(Path(config["frequency_manifest"]).read_text())
+        raw = frequency_payload["manifest"]
+        frequency = DocumentManifest(
+            protocol_version=raw["protocol_version"],
+            role=raw["role"],
+            source=raw["source"],
+            documents=tuple(ManifestDocument(**row) for row in raw["documents"]),
+        )
+        config["frequency_table"] = str(
+            self.write_frequency_table(frequency, num_documents=2)
+        )
+
+        with self.assertRaisesRegex(ValueError, "num_documents.*frequency manifest"):
+            validate_protocol_inputs(config)
+
+    def test_tampered_cross_corpus_receipt_is_rejected(self):
+        config = self.complete_config()
+        path = Path(config["cross_corpus_receipt"])
+        payload = json.loads(path.read_text())
+        payload["receipt"]["comparison_transcript_sha256"] = "0" * 64
+        path.write_text(json.dumps(payload))
+
+        with self.assertRaisesRegex(ValueError, "artifact_id"):
             validate_protocol_inputs(config)
 
     def test_runtime_tokenizer_identity_cannot_be_spoofed_by_config(self):

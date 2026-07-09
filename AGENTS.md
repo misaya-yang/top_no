@@ -72,8 +72,10 @@ GPU/MPS memory; do not infer paper numbers from smoke tests.
 
 ## Current Blockers
 
-- Do not rent GPU for citable prediction-set runs until the frequency-table,
-  document split, and calibrated-vs-calibrated gate repairs are implemented.
+- Do not run citable prediction-set experiments until the PR-2 conformal
+  core/method registry and PR-3 calibrated-vs-calibrated gate are implemented.
+- PR-1d cross-corpus receipts are accepted only after a full recomputation from
+  the bound frequency/evaluation JSONL inputs; wrapper hashes alone are not proof.
 - The legacy prediction-set runner builds frequency counts from the loaded text
   pool and consumes calibration/eval positions sequentially.
 - `nu_topp_floor`, `nu_entropy`, and `nu_mathboost` are archived legacy repair

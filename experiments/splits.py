@@ -250,13 +250,15 @@ def content_sha256(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def _normalize_text(text: str) -> tuple[str, ...]:
+def normalize_text(text: str) -> tuple[str, ...]:
+    """Apply the normalization frozen by the document-clustering protocol."""
     normalized = unicodedata.normalize("NFKC", text).casefold()
     return tuple(normalized.split())
 
 
-def _shingle_hashes(text: str, shingle_size: int) -> frozenset[int]:
-    tokens = _normalize_text(text)
+def shingle_hashes(text: str, shingle_size: int) -> frozenset[int]:
+    """Return deterministic SHA-256-derived token-shingle hashes."""
+    tokens = normalize_text(text)
     if not tokens:
         raise ValueError("source document text must contain a non-whitespace token")
     width = min(shingle_size, len(tokens))
@@ -275,12 +277,13 @@ def _mix64(value: int) -> int:
     return (value ^ (value >> 31)) & mask
 
 
-def _minhash_signature(
+def minhash_signature(
     shingles: frozenset[int],
     *,
     minhash_seed: int,
     num_perm: int,
 ) -> tuple[int, ...]:
+    """Return the deterministic MinHash signature used by split artifacts."""
     seeds = tuple(_mix64(minhash_seed + index) for index in range(num_perm))
     return tuple(min(_mix64(value ^ seed) for value in shingles) for seed in seeds)
 
@@ -289,7 +292,7 @@ def _jaccard(left: frozenset[int], right: frozenset[int]) -> float:
     return len(left & right) / len(left | right)
 
 
-def _exact_prefix_candidates(
+def exact_prefix_candidates(
     shingle_sets: Sequence[frozenset[int]],
     threshold: float,
 ) -> set[tuple[int, int]]:
@@ -394,9 +397,9 @@ def cluster_documents_minhash_lsh(
         raise ValueError("num_perm must be positive and divisible by lsh_bands")
 
     content_hashes = tuple(content_sha256(item.text) for item in ordered)
-    shingle_sets = tuple(_shingle_hashes(item.text, shingle_size) for item in ordered)
+    shingle_sets = tuple(shingle_hashes(item.text, shingle_size) for item in ordered)
     signatures = tuple(
-        _minhash_signature(
+        minhash_signature(
             shingles,
             minhash_seed=minhash_seed,
             num_perm=num_perm,
@@ -422,7 +425,7 @@ def cluster_documents_minhash_lsh(
             owners = buckets.setdefault(key, [])
             candidates.update((previous, index) for previous in owners)
             owners.append(index)
-    candidates.update(_exact_prefix_candidates(shingle_sets, threshold))
+    candidates.update(exact_prefix_candidates(shingle_sets, threshold))
     for left, right in sorted(candidates):
         if content_hashes[left] == content_hashes[right]:
             continue
