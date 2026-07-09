@@ -273,6 +273,16 @@ class PredictionProtocolTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "position salts.*strings"):
                     validate_protocol_inputs(config)
 
+    def test_calibration_and_test_manifests_must_be_nonempty(self):
+        class EmptyBound:
+            @staticmethod
+            def for_role(_role):
+                return ()
+
+        with patch("protocol.bind_split_documents", return_value=EmptyBound()):
+            with self.assertRaisesRegex(ValueError, "calibration and test manifests"):
+                validate_protocol_inputs(self.complete_config())
+
     def test_manifest_role_mismatch_fails(self):
         config = self.complete_config()
         wrong_path, _ = self.write_manifest("test", "replacement")

@@ -166,7 +166,7 @@ def validate_protocol_inputs(config: dict[str, Any]) -> dict[str, Any]:
             f"manifest={frequency_manifest_hash!r}"
         )
 
-    bind_split_documents(
+    bound_documents = bind_split_documents(
         Path(config["split_receipt"]),
         Path(config["document_jsonl"]),
         configured_manifests={
@@ -175,6 +175,8 @@ def validate_protocol_inputs(config: dict[str, Any]) -> dict[str, Any]:
             "test": Path(config["test_manifest"]),
         },
     )
+    if not bound_documents.for_role("cal") or not bound_documents.for_role("test"):
+        raise ValueError("calibration and test manifests must both be non-empty")
 
     raise RuntimeError(
         "blocked_pending_cross_corpus_cluster: frequency artifacts and evaluation "

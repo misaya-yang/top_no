@@ -6,19 +6,22 @@ The full external review is stored in
 
 ## Current Stop Condition
 
-No paper-grade GPU run should be launched until PR-1c through PR-3 are complete.
-PR-1a now provides immutable external frequency artifacts, and PR-1b provides
-deterministic split construction receipts and position selectors. The current
-`experiments/eval_prediction_sets.py` path remains blocked because:
+No paper-grade GPU run should be launched until PR-1d through PR-3 are complete.
+PR-1a now provides immutable external frequency artifacts, PR-1b provides
+deterministic split construction receipts and position selectors, and PR-1c
+binds those artifacts to exact text and a prefix-only `[G]` forward helper. The
+normal `experiments/eval_prediction_sets.py` path remains blocked because:
 
-1. manifests are not yet bound to the exact text passed through the model;
-2. its legacy calibration/evaluation positions are consumed sequentially rather than drawn
-   from disjoint document-level split manifests;
-3. the current gate compares a calibrated method against mostly uncalibrated
+1. `D_freq` and evaluation near-duplicate disjointness lacks a joint or
+   cross-corpus construction proof;
+2. the calibrated methods registry and suffstats replay are not implemented;
+3. the current gate compares one calibrated method against mostly uncalibrated
    baselines.
 
-The runner refuses nonlegacy execution with `blocked_pending_pr1c`. Explicit
-`allow_legacy_protocol=true` remains available only for noncitable smoke tests.
+The runner refuses nonlegacy execution with
+`blocked_pending_cross_corpus_cluster` before model allocation. Explicit
+`allow_legacy_protocol=true` retains the old sequential path only for
+noncitable smoke tests.
 
 ## PR-0: Narrative And Legacy Guardrails
 
@@ -41,7 +44,7 @@ Status: complete.
 
 ## PR-1b: Deterministic Split Artifacts
 
-Status: complete after the PR-1b branch is merged.
+Status: complete.
 
 - Normalized 13-gram MinHash-LSH plus threshold-complete prefix candidates,
   followed by exact Jaccard `>= 0.8` confirmation and deterministic connected
