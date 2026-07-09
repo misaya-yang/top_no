@@ -12,5 +12,5 @@
 - [x] Advance the fail-closed terminal reason to `blocked_pending_pr2_pr3`.
 - [x] Cover exact duplicates, the Jaccard-0.8 LSH miss counterexample,
   tampering, weak thresholds, CLI behavior, and protocol integration.
-- [ ] Obtain independent code review and run local/server verification before
+- [x] Obtain independent code review and run local/server verification before
   merge and push.

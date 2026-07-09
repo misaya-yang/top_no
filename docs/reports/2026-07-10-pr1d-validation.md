@@ -27,6 +27,13 @@ threshold, input reordering, missing/extra/modified rows, weak split parameters,
 wrapper tampering, a self-consistent forged zero-match artifact, fixed scope,
 CLI refusal, protocol integration, and pre-model fail-closed behavior.
 
+Independent review also compared the cross candidate generator against brute
+force on 2,000 randomized threshold cases and observed zero false negatives.
+The reviewer found two Important issues in the initial implementation—discarded
+evaluation cluster members were outside the scan, and the split receipt was
+read twice—and verified both repairs before reporting no remaining
+Critical/Important findings.
+
 ## Synthetic scaling probe
 
 The server probe built a PR-1b split for 2,000 distinct synthetic evaluation
@@ -37,14 +44,14 @@ disjoint. This is an engineering benchmark, not paper evidence.
 ```json
 {
   "candidate_pairs": 0,
-  "cross_audit_seconds": 6.475,
+  "cross_audit_seconds": 6.447,
   "evaluation_input_documents": 2000,
   "evaluation_documents": 2000,
   "exact_comparisons": 0,
   "frequency_documents": 2000,
   "matches": 0,
-  "max_rss_mb": 66.9,
-  "split_seconds": 3.211
+  "max_rss_mb": 67.6,
+  "split_seconds": 3.225
 }
 ```
 
