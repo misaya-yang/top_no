@@ -79,7 +79,12 @@ class PredictionProtocolTests(unittest.TestCase):
     def write_frequency_table(
         self, frequency_manifest, source_hash=None, num_documents=None
     ):
-        counts = torch.tensor([4, 0, 7], dtype=torch.int64)
+        document_count = (
+            len(frequency_manifest.documents)
+            if num_documents is None
+            else num_documents
+        )
+        counts = torch.tensor([4, 0, document_count], dtype=torch.int64)
         metadata = make_frequency_table_metadata(
             counts,
             model_id="fixture/model",
@@ -87,11 +92,8 @@ class PredictionProtocolTests(unittest.TestCase):
             tokenizer_revision="model-commit",
             source_manifest_sha256=source_hash or manifest_sha256(frequency_manifest),
             exclusion_token_ids=(1,),
-            num_documents=(
-                len(frequency_manifest.documents)
-                if num_documents is None
-                else num_documents
-            ),
+            num_documents=document_count,
+            eos_token_id=2,
         )
         return save_frequency_table(counts, metadata, self.root / "frequency-table")
 
@@ -245,6 +247,7 @@ class PredictionProtocolTests(unittest.TestCase):
 
         class Tokenizer:
             all_special_ids = [1]
+            eos_token_id = 2
             name_or_path = "fixture/model"
             init_kwargs = {"_commit_hash": "model-commit"}
 
@@ -269,7 +272,7 @@ class PredictionProtocolTests(unittest.TestCase):
             texts=[],
         )
 
-        self.assertEqual(counts.tolist(), [4, 0, 7])
+        self.assertEqual(counts.tolist(), [4, 0, 1])
         self.assertEqual(metadata.counts_sha256, counts_sha256(counts))
 
     def test_effective_config_hash_is_order_independent(self):
@@ -438,6 +441,7 @@ class PredictionProtocolTests(unittest.TestCase):
             expected_tokenizer_revision="model-commit",
             expected_vocab_size=3,
             expected_exclusion_token_ids=(1,),
+            expected_eos_token_id=2,
         )
 
     def test_downstream_loads_exact_artifact_referenced_by_metrics(self):
@@ -445,7 +449,7 @@ class PredictionProtocolTests(unittest.TestCase):
 
         counts, metadata = self.load_metrics_counts(metrics_path)
 
-        self.assertEqual(counts.tolist(), [4, 0, 7])
+        self.assertEqual(counts.tolist(), [4, 0, 1])
         self.assertEqual(metadata.counts_sha256, counts_sha256(counts))
 
     def test_downstream_entrypoints_use_the_upstream_artifact(self):
@@ -453,6 +457,7 @@ class PredictionProtocolTests(unittest.TestCase):
 
         class Tokenizer:
             all_special_ids = [1]
+            eos_token_id = 2
             name_or_path = "fixture/model"
             init_kwargs = {"_commit_hash": "model-commit"}
 
@@ -471,7 +476,7 @@ class PredictionProtocolTests(unittest.TestCase):
         for builder in (build_reasoning_counts, build_openended_counts):
             with self.subTest(builder=builder.__module__):
                 counts = builder(Model(), Tokenizer(), config)
-                self.assertEqual(counts.tolist(), [4, 0, 7])
+                self.assertEqual(counts.tolist(), [4, 0, 1])
 
     def test_downstream_rejects_missing_frequency_reference(self):
         metrics_path = self.root / "prediction_set_metrics.json"
@@ -501,7 +506,7 @@ class PredictionProtocolTests(unittest.TestCase):
 
         counts, _ = self.load_metrics_counts(metrics_path)
 
-        self.assertEqual(counts.tolist(), [4, 0, 7])
+        self.assertEqual(counts.tolist(), [4, 0, 1])
 
     def test_legacy_flag_must_be_an_explicit_boolean(self):
         for value in ("false", 1, {}):
@@ -551,6 +556,7 @@ class PredictionProtocolTests(unittest.TestCase):
 
         class Tokenizer:
             all_special_ids = [1]
+            eos_token_id = 2
             name_or_path = "other/model"
             init_kwargs = {"_commit_hash": "model-commit"}
 
@@ -581,6 +587,7 @@ class PredictionProtocolTests(unittest.TestCase):
 
         class Tokenizer:
             all_special_ids = [1]
+            eos_token_id = 2
             name_or_path = "fixture/model"
             init_kwargs = {"_commit_hash": "other-commit"}
 
@@ -610,6 +617,7 @@ class PredictionProtocolTests(unittest.TestCase):
 
         class Tokenizer:
             all_special_ids = [1]
+            eos_token_id = 2
             name_or_path = "fixture/model"
             init_kwargs = {}
 
@@ -643,7 +651,7 @@ class PredictionProtocolTests(unittest.TestCase):
             texts=[],
         )
 
-        self.assertEqual(counts.tolist(), [4, 0, 7])
+        self.assertEqual(counts.tolist(), [4, 0, 1])
         self.assertEqual(metadata.tokenizer_revision, "model-commit")
 
 

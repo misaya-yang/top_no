@@ -31,7 +31,7 @@ from freq_table import (
     FrequencyTableMetadata,
     load_frequency_table,
     runtime_tokenizer_identity,
-    special_token_ids,
+    frequency_exclusion_token_ids,
 )
 from protocol import effective_config_sha256, validate_protocol_inputs
 from samplers import get_keep_mask
@@ -431,7 +431,8 @@ def resolve_token_counts(
             expected_tokenizer_id=tokenizer_id,
             expected_tokenizer_revision=tokenizer_revision,
             expected_vocab_size=model.config.vocab_size,
-            expected_exclusion_token_ids=special_token_ids(tokenizer),
+            expected_exclusion_token_ids=frequency_exclusion_token_ids(tokenizer),
+            expected_eos_token_id=tokenizer.eos_token_id,
         )
     if not config.get("allow_legacy_protocol"):
         raise RuntimeError(

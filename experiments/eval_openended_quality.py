@@ -21,7 +21,7 @@ from eval_prediction_sets import (
     validate_runtime_model_and_tokenizer,
 )
 from eval_reasoning_self_consistency import conformal_kwargs_from_metrics
-from freq_table import load_frequency_table_from_metrics, special_token_ids
+from freq_table import frequency_exclusion_token_ids, load_frequency_table_from_metrics
 from samplers import batch_generate
 
 
@@ -161,7 +161,8 @@ def build_counts_for_strategies(model, tokenizer, config: dict[str, Any]) -> tor
         expected_tokenizer_id=tokenizer_id,
         expected_tokenizer_revision=tokenizer_revision,
         expected_vocab_size=model.config.vocab_size,
-        expected_exclusion_token_ids=special_token_ids(tokenizer),
+        expected_exclusion_token_ids=frequency_exclusion_token_ids(tokenizer),
+        expected_eos_token_id=tokenizer.eos_token_id,
     )
     return counts
 

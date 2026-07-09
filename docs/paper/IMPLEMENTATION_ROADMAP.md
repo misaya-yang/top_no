@@ -89,6 +89,22 @@ Required tests: disjoint manifest tripwire, one-position-per-document
 determinism, exact receipt/text binding, and refusal on count/eval near-duplicate
 intersection. These are covered by the PR-1a through PR-1d tests.
 
+## PR-1e: Reproducible Frequency-Table Builder
+
+Status: implementation in progress; required before any paper-grade runner can
+consume a production frequency table.
+
+- The v2 frequency-table schema binds the fixed raw-text tokenization policy
+  and runtime EOS token ID in the artifact identity.
+- Raw tokenizer special/control IDs are filtered, then exactly one synthetic
+  EOS boundary is counted per frozen document; loaders require
+  `counts[eos_token_id] == num_documents`.
+- `prepare_frequency_table.py` binds the exact frequency manifest/JSONL and
+  loads only a pinned offline tokenizer and model config. It uses model
+  `vocab_size`, never tokenizer length, and never loads model weights.
+- This single-process builder is an auditable foundation, not the future
+  sharded multi-billion-token production pipeline.
+
 ## PR-2: Conformal Core And Methods Registry
 
 Status: PR-2a conformal-core implementation is complete; runner integration,

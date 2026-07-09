@@ -14,6 +14,7 @@ from splits import (
     MINHASH_IMPLEMENTATION,
     NORMALIZATION_POLICY,
     SPLIT_CONSTRUCTION_VERSION,
+    DocumentManifest,
     SourceDocument,
     content_sha256,
     load_manifest,
@@ -100,10 +101,10 @@ def cross_corpus_receipt_sha256(receipt: CrossCorpusReceipt) -> str:
     return hashlib.sha256(_canonical_json(asdict(receipt))).hexdigest()
 
 
-def _bind_frequency_documents(
+def bind_frequency_documents(
     manifest_path: Path,
     document_jsonl: Path,
-) -> tuple[object, tuple[SourceDocument, ...]]:
+) -> tuple[DocumentManifest, tuple[SourceDocument, ...]]:
     manifest = load_manifest(Path(manifest_path))
     if manifest.role != "freq":
         raise ValueError(f"frequency manifest role must be 'freq', got {manifest.role!r}")
@@ -257,7 +258,7 @@ def audit_cross_corpus(
     configured_eval_manifests: Mapping[str, Path] | None = None,
 ) -> CrossCorpusAudit:
     """Recompute a cross-corpus audit from frozen source artifacts."""
-    frequency_manifest, frequency_documents = _bind_frequency_documents(
+    frequency_manifest, frequency_documents = bind_frequency_documents(
         frequency_manifest_path,
         frequency_document_jsonl,
     )

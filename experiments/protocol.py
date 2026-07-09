@@ -158,6 +158,7 @@ def validate_protocol_inputs(config: dict[str, Any]) -> dict[str, Any]:
         expected_tokenizer_revision=metadata.tokenizer_revision,
         expected_vocab_size=metadata.vocab_size,
         expected_exclusion_token_ids=metadata.exclusion_token_ids,
+        expected_eos_token_id=metadata.eos_token_id,
     )
     reference = _frequency_table_reference(metadata_path)
     frequency_manifest_hash = manifest_sha256(manifests["freq"])

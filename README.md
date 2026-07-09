@@ -80,6 +80,23 @@ The full model-backed experiments expect the relevant Hugging Face model cache t
 exist locally. The suite scripts default to offline Hugging Face mode for the GPU
 server environment.
 
+Build a small pinned frequency table from an already frozen `freq` manifest and
+matching JSONL without loading model weights:
+
+```bash
+HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
+python3 experiments/prepare_frequency_table.py \
+  --document-jsonl /data/frozen_d_freq.jsonl \
+  --source-manifest /data/freq_manifest.json \
+  --model-id Qwen/Qwen2.5-7B \
+  --revision <pinned-hugging-face-commit> \
+  --output-dir /data/frequency_table
+```
+
+This is a single-process artifact builder. Multi-billion-token paper tables
+still require a later sharded/resumable production pipeline and provenance
+receipt.
+
 ## Run
 
 Run the main experiment suite:

@@ -7,20 +7,27 @@ import json
 import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Collection
+from typing import Any, Collection, Sequence
 
 import torch
 
+from splits import SourceDocument
+
 
 PROTOCOL_VERSION = "icml2027-pr1a"
+FREQUENCY_TABLE_SCHEMA_VERSION = "icml2027-freq-table-v2"
+TOKENIZATION_POLICY = "raw-no-specials-filter-specials-plus-one-eos-per-doc-v1"
 
 
 @dataclass(frozen=True)
 class FrequencyTableMetadata:
     protocol_version: str
+    artifact_schema_version: str
     model_id: str
     tokenizer_id: str
     tokenizer_revision: str | None
+    tokenization_policy: str
+    eos_token_id: int
     vocab_size: int
     counts_dtype: str
     counts_sha256: str
@@ -30,18 +37,93 @@ class FrequencyTableMetadata:
     num_tokens: int
 
 
-def special_token_ids(tokenizer: Any) -> tuple[int, ...]:
-    """Return the tokenizer's valid integer special IDs in canonical order."""
+def frequency_exclusion_token_ids(tokenizer: Any) -> tuple[int, ...]:
+    """Return special/control IDs excluded from corpus frequency counts.
+
+    EOS is retained because the fixed tokenization policy adds exactly one
+    synthetic EOS boundary per frozen source document.
+    """
     values = getattr(tokenizer, "all_special_ids", ()) or ()
+    eos_token_id = getattr(tokenizer, "eos_token_id", None)
     return tuple(
         sorted(
             {
                 value
                 for value in values
                 if isinstance(value, int) and not isinstance(value, bool)
+                and value != eos_token_id
             }
         )
     )
+
+
+def special_token_ids(tokenizer: Any) -> tuple[int, ...]:
+    """Compatibility alias for the paper frequency-exclusion policy."""
+    return frequency_exclusion_token_ids(tokenizer)
+
+
+def count_frequency_tokens(
+    tokenizer: Any,
+    documents: Sequence[SourceDocument],
+    *,
+    vocab_size: int,
+) -> torch.Tensor:
+    """Count raw document tokens plus exactly one synthetic EOS per document."""
+    if isinstance(vocab_size, bool) or not isinstance(vocab_size, int) or vocab_size <= 0:
+        raise ValueError("vocab_size must be a positive integer")
+    if not isinstance(documents, Sequence) or isinstance(documents, (str, bytes)):
+        raise ValueError("documents must be a sequence of SourceDocument values")
+    if not documents:
+        raise ValueError("documents must not be empty")
+    eos_token_id = getattr(tokenizer, "eos_token_id", None)
+    if (
+        isinstance(eos_token_id, bool)
+        or not isinstance(eos_token_id, int)
+        or eos_token_id < 0
+        or eos_token_id >= vocab_size
+    ):
+        raise ValueError("tokenizer eos_token_id must be valid for vocab_size")
+    raw_special_ids = {
+        value
+        for value in (getattr(tokenizer, "all_special_ids", ()) or ())
+        if isinstance(value, int) and not isinstance(value, bool)
+    }
+    counts = torch.zeros(vocab_size, dtype=torch.int64)
+    seen_doc_ids: set[str] = set()
+    for document in documents:
+        if not isinstance(document, SourceDocument):
+            raise ValueError("documents must contain SourceDocument values")
+        if document.doc_id in seen_doc_ids:
+            raise ValueError(f"duplicate doc_id: {document.doc_id!r}")
+        seen_doc_ids.add(document.doc_id)
+        encoded = tokenizer.encode(
+            document.text,
+            add_special_tokens=False,
+            truncation=False,
+            padding=False,
+        )
+        if isinstance(encoded, torch.Tensor):
+            encoded = encoded.detach().cpu().flatten().tolist()
+        if not isinstance(encoded, Sequence) or isinstance(encoded, (str, bytes)):
+            raise ValueError("tokenizer.encode must return a sequence of token IDs")
+        retained = []
+        for token_id in encoded:
+            if isinstance(token_id, bool) or not isinstance(token_id, int):
+                raise ValueError("tokenizer produced a non-integer token ID")
+            if token_id < 0 or token_id >= vocab_size:
+                raise ValueError(
+                    f"tokenizer produced out-of-range token ID {token_id}"
+                )
+            if token_id not in raw_special_ids:
+                retained.append(token_id)
+        retained.append(eos_token_id)
+        counts += torch.bincount(
+            torch.tensor(retained, dtype=torch.int64),
+            minlength=vocab_size,
+        )
+    if int(counts[eos_token_id].item()) != len(documents):
+        raise AssertionError("EOS boundary count must equal number of documents")
+    return counts
 
 
 def runtime_tokenizer_identity(
@@ -176,10 +258,14 @@ def _validate_metadata(metadata: FrequencyTableMetadata) -> None:
             f"protocol_version mismatch: artifact={metadata.protocol_version!r} "
             f"expected={PROTOCOL_VERSION!r}"
         )
+    if metadata.artifact_schema_version != FREQUENCY_TABLE_SCHEMA_VERSION:
+        raise ValueError("unsupported artifact_schema_version")
     _require_string(metadata.model_id, "model_id")
     _require_string(metadata.tokenizer_id, "tokenizer_id")
     if metadata.tokenizer_revision is not None:
         _require_string(metadata.tokenizer_revision, "tokenizer_revision")
+    if metadata.tokenization_policy != TOKENIZATION_POLICY:
+        raise ValueError("unsupported tokenization_policy")
     if _require_integer(metadata.vocab_size, "vocab_size") <= 0:
         raise ValueError("vocab_size must be positive")
     if metadata.counts_dtype != "torch.int64":
@@ -196,6 +282,14 @@ def _validate_metadata(metadata: FrequencyTableMetadata) -> None:
     )
     if normalized != metadata.exclusion_token_ids:
         raise ValueError("exclusion_token_ids must be sorted and unique")
+    eos_token_id = _require_integer(
+        metadata.eos_token_id,
+        "eos_token_id",
+    )
+    if eos_token_id < 0 or eos_token_id >= metadata.vocab_size:
+        raise ValueError("eos_token_id is out of range")
+    if eos_token_id in metadata.exclusion_token_ids:
+        raise ValueError("eos_token_id cannot be excluded")
 
 
 def make_frequency_table_metadata(
@@ -207,6 +301,7 @@ def make_frequency_table_metadata(
     source_manifest_sha256: str,
     exclusion_token_ids: Collection[int],
     num_documents: int,
+    eos_token_id: int,
 ) -> FrequencyTableMetadata:
     """Create metadata from validated counts and frozen source provenance."""
     canonical, exclusions = _canonicalize_for_artifact(counts, exclusion_token_ids)
@@ -219,9 +314,12 @@ def make_frequency_table_metadata(
         raise ValueError("num_documents must be non-negative")
     metadata = FrequencyTableMetadata(
         protocol_version=PROTOCOL_VERSION,
+        artifact_schema_version=FREQUENCY_TABLE_SCHEMA_VERSION,
         model_id=model_id,
         tokenizer_id=tokenizer_id,
         tokenizer_revision=tokenizer_revision,
+        tokenization_policy=TOKENIZATION_POLICY,
+        eos_token_id=eos_token_id,
         vocab_size=canonical.numel(),
         counts_dtype="torch.int64",
         counts_sha256=counts_sha256(canonical),
@@ -263,6 +361,12 @@ def _validate_counts_against_metadata(
             f"num_tokens mismatch: metadata={metadata.num_tokens} "
             f"actual={int(canonical.sum().item())}"
         )
+    if int(canonical[metadata.eos_token_id].item()) != metadata.num_documents:
+        raise ValueError(
+            "EOS boundary count must equal num_documents: "
+            f"eos_count={int(canonical[metadata.eos_token_id].item())} "
+            f"num_documents={metadata.num_documents}"
+        )
     return canonical
 
 
@@ -301,9 +405,12 @@ def _metadata_from_dict(payload: object) -> FrequencyTableMetadata:
         raise ValueError("frequency-table metadata must be a JSON object")
     required = {
         "protocol_version",
+        "artifact_schema_version",
         "model_id",
         "tokenizer_id",
         "tokenizer_revision",
+        "tokenization_policy",
+        "eos_token_id",
         "vocab_size",
         "counts_dtype",
         "counts_sha256",
@@ -326,9 +433,21 @@ def _metadata_from_dict(payload: object) -> FrequencyTableMetadata:
         raise ValueError("exclusion_token_ids must be a JSON array")
     metadata = FrequencyTableMetadata(
         protocol_version=_require_string(payload["protocol_version"], "protocol_version"),
+        artifact_schema_version=_require_string(
+            payload["artifact_schema_version"],
+            "artifact_schema_version",
+        ),
         model_id=_require_string(payload["model_id"], "model_id"),
         tokenizer_id=_require_string(payload["tokenizer_id"], "tokenizer_id"),
         tokenizer_revision=revision,
+        tokenization_policy=_require_string(
+            payload["tokenization_policy"],
+            "tokenization_policy",
+        ),
+        eos_token_id=_require_integer(
+            payload["eos_token_id"],
+            "eos_token_id",
+        ),
         vocab_size=_require_integer(payload["vocab_size"], "vocab_size"),
         counts_dtype=_require_string(payload["counts_dtype"], "counts_dtype"),
         counts_sha256=_require_string(payload["counts_sha256"], "counts_sha256"),
@@ -394,6 +513,7 @@ def load_frequency_table(
     expected_tokenizer_revision: str | None,
     expected_vocab_size: int,
     expected_exclusion_token_ids: Collection[int],
+    expected_eos_token_id: int,
 ) -> tuple[torch.Tensor, FrequencyTableMetadata]:
     """Load counts only after integrity and compatibility checks pass."""
     metadata, _, counts_path = load_frequency_table_metadata(metadata_path)
@@ -410,6 +530,7 @@ def load_frequency_table(
         ),
         "vocab_size": (metadata.vocab_size, expected_vocab_size),
         "exclusion_token_ids": (metadata.exclusion_token_ids, expected_exclusions),
+        "eos_token_id": (metadata.eos_token_id, expected_eos_token_id),
     }
     for field_name, (actual, expected) in checks.items():
         if actual != expected:
@@ -437,6 +558,7 @@ def load_frequency_table_from_metrics(
     expected_tokenizer_revision: str | None,
     expected_vocab_size: int,
     expected_exclusion_token_ids: Collection[int],
+    expected_eos_token_id: int,
 ) -> tuple[torch.Tensor, FrequencyTableMetadata]:
     """Load the exact frequency artifact recorded by upstream calibration."""
     metrics_path = Path(metrics_path)
@@ -500,4 +622,5 @@ def load_frequency_table_from_metrics(
         expected_tokenizer_revision=expected_tokenizer_revision,
         expected_vocab_size=expected_vocab_size,
         expected_exclusion_token_ids=expected_exclusion_token_ids,
+        expected_eos_token_id=expected_eos_token_id,
     )
