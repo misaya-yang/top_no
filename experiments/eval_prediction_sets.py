@@ -478,6 +478,17 @@ def batch_document_position_logits(
     roles = {document.role for document in documents}
     if len(roles) != 1:
         raise ValueError("documents must come from a single manifest role")
+    role = next(iter(roles))
+    count_key = {"cal": "n_calibration", "test": "n_eval"}.get(role)
+    if count_key is not None and config.get(count_key) is not None:
+        expected_count = config[count_key]
+        if isinstance(expected_count, bool) or not isinstance(expected_count, int):
+            raise ValueError(f"{count_key} must be an integer manifest count")
+        if expected_count != len(documents):
+            raise ValueError(
+                f"{count_key}={expected_count} does not match {role} "
+                f"manifest count={len(documents)}"
+            )
     doc_ids = [document.doc_id for document in documents]
     if len(set(doc_ids)) != len(doc_ids):
         raise ValueError("documents contain duplicate doc_id values")

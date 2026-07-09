@@ -182,6 +182,21 @@ class DocumentForwardTests(unittest.TestCase):
             {"doc-c"},
         )
 
+    def test_configured_position_count_is_an_assertion_not_a_truncation(self):
+        tokens = {"text-a": list(range(17)), "text-b": list(range(21))}
+
+        with self.assertRaisesRegex(ValueError, "n_calibration.*manifest count"):
+            list(
+                batch_document_position_logits(
+                    self.Model(),
+                    self.Tokenizer(tokens),
+                    self.documents(),
+                    {"batch_size": 2, "max_length": 16, "n_calibration": 1},
+                    torch.device("cpu"),
+                    position_salt="cal-salt",
+                )
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
