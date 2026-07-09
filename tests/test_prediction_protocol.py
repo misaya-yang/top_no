@@ -293,7 +293,10 @@ class PredictionProtocolTests(unittest.TestCase):
             validate_protocol_inputs({"allow_legacy_protocol": False})
 
     def test_complete_inputs_advance_to_pr2_pr3_block(self):
-        with self.assertRaisesRegex(RuntimeError, "blocked_pending_pr2_pr3"):
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "blocked_pending_pr2_pr3.*missing_paper_methods=.*c_logprob.*raps",
+        ):
             validate_protocol_inputs(self.complete_config())
 
     def test_pr2_pr3_block_still_precedes_model_allocation(self):

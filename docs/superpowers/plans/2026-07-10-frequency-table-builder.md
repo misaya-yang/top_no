@@ -9,4 +9,4 @@
 - [x] Add fake-tokenizer and mock-offline-CLI tests.
 - [x] Run a real pinned Qwen tokenizer smoke on the server.
 - [x] Obtain independent review with no remaining Critical/Important findings.
-- [ ] Merge and push the repaired slice.
+- [x] Merge and push the repaired slice.

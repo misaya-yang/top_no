@@ -91,8 +91,8 @@ intersection. These are covered by the PR-1a through PR-1d tests.
 
 ## PR-1e: Reproducible Frequency-Table Builder
 
-Status: implementation in progress; required before any paper-grade runner can
-consume a production frequency table.
+Status: auditable single-process builder complete; a production-scale frequency
+corpus/table is still required before any paper-grade runner can execute.
 
 - The v2 frequency-table schema binds the fixed raw-text tokenization policy
   and runtime EOS token ID in the artifact identity.
@@ -107,14 +107,19 @@ consume a production frequency table.
 
 ## PR-2: Conformal Core And Methods Registry
 
-Status: PR-2a conformal-core implementation is complete; runner integration,
-the methods registry, tuning artifacts, and suffstats remain blocked.
+Status: PR-2a conformal-core implementation is complete. The first PR-2b
+registry slice supplies stable identities plus tensor-only execution for
+C-margin, APS, signed C-nu, frequency-Mondrian margin, and entropy-Mondrian
+margin. Remaining mandatory methods, runner integration, tuning artifacts,
+per-document evidence, and suffstats remain blocked.
 
 - Add `mondrian_quantiles`, score dithering, and a tuning path that reads
   `D_tune` only.
-- Add `experiments/methods.py` for calibrated baselines: C-margin, C-logprob,
+- Complete `experiments/methods.py` for calibrated baselines: C-margin, C-logprob,
   C-zmargin, APS, RAPS, TS+APS, CNS, entropy-Mondrian, frequency-Mondrian,
   learned-h/g, and C-nu.
+- Keep paper execution fail-closed while any mandatory registry key is marked
+  unavailable; the blocker reports the exact missing keys.
 - Add suffstats write/replay so Phase 0 and Phase 1 can share forward passes.
 
 Required tests: synthetic exchangeable coverage, equivalence tests

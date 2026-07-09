@@ -35,6 +35,9 @@ first calibrated prediction-set pipeline:
 - `min_p`, `fixed_margin`, and `conformal_nu` are available in the shared
   sampler surface.
 - `experiments/conformal.py` contains the split-conformal scoring helpers.
+- `experiments/methods.py` assigns canonical registry keys to every planned
+  calibrated baseline and currently executes C-margin, APS, signed C-nu, and
+  frequency-/entropy-Mondrian margin through one tensor-only interface.
 - `top_p` uses the standard nucleus rule and keeps the crossing token.
 - Batch generation uses left padding, EOS-aware stopping, and generated-token-only
   metrics.
@@ -49,7 +52,9 @@ rerun under the calibrated protocol.
 
 Protocol blocker: the current prediction-set runner is intentionally blocked
 for paper-grade runs until the PR-2 conformal core and PR-3 calibrated gate
-land. PR-1 now binds immutable frequency counts, deterministic document splits,
+land. Registered-but-unimplemented paper methods, tuning artifacts, per-document
+evidence/suffstats, and the calibrated gate remain explicit blockers. PR-1 now
+binds immutable frequency counts, deterministic document splits,
 exact source text, and a recomputed cross-corpus near-duplicate receipt. The
 legacy runner builds token counts from the loaded calibration/eval text pool and
 uses a sequential calibration/eval split, so its outputs are smoke-test

@@ -10,4 +10,4 @@
 - [x] Freeze stable top-p tie ordering and test crossing-token equivalence.
 - [x] Test C-margin/min-p and C-nu(0)/C-margin equivalence.
 - [x] Obtain independent review and run local/server verification.
-- [ ] Merge and push the reviewed slice.
+- [x] Merge and push the reviewed slice.

@@ -13,6 +13,7 @@ from freq_table import (
     load_frequency_table,
     load_frequency_table_metadata,
 )
+from methods import missing_paper_method_keys
 from splits import assert_pairwise_disjoint, load_manifest, manifest_sha256
 
 
@@ -204,9 +205,11 @@ def validate_protocol_inputs(config: dict[str, Any]) -> dict[str, Any]:
                 f"cross-corpus evaluation manifest changed during validation: {role}"
             )
 
+    missing_methods = ",".join(sorted(missing_paper_method_keys()))
     raise RuntimeError(
         "blocked_pending_pr2_pr3: PR-1 provenance, deterministic document splits, "
         "exact text binding, and recomputed cross-corpus disjointness all passed, "
         "but the conformal core/method registry and calibrated-vs-calibrated gate "
-        "are not yet complete. Paper-grade execution remains blocked."
+        "are not yet complete. Paper-grade execution remains blocked. "
+        f"missing_paper_methods={missing_methods}"
     )
