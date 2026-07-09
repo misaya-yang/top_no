@@ -91,6 +91,9 @@ intersection. These are covered by the PR-1a through PR-1d tests.
 
 ## PR-2: Conformal Core And Methods Registry
 
+Status: PR-2a conformal-core implementation is in progress; runner integration,
+the methods registry, tuning artifacts, and suffstats remain blocked.
+
 - Add `mondrian_quantiles`, score dithering, and a tuning path that reads
   `D_tune` only.
 - Add `experiments/methods.py` for calibrated baselines: C-margin, C-logprob,

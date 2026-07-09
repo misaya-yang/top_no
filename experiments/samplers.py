@@ -40,7 +40,8 @@ def _top_p_keep_mask(logits: torch.Tensor, p: float) -> torch.Tensor:
         return torch.ones_like(logits, dtype=torch.bool)
 
     probs = F.softmax(logits, dim=-1)
-    sorted_probs, sorted_idx = probs.sort(dim=-1, descending=True)
+    sorted_idx = torch.argsort(probs, dim=-1, descending=True, stable=True)
+    sorted_probs = probs.gather(-1, sorted_idx)
     cum_probs = sorted_probs.cumsum(dim=-1)
     remove = cum_probs > p
     remove[..., 1:] = remove[..., :-1].clone()
