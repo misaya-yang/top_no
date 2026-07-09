@@ -207,8 +207,8 @@ class PredictionProtocolTests(unittest.TestCase):
         ):
             validate_protocol_inputs({"allow_legacy_protocol": False})
 
-    def test_complete_inputs_remain_blocked_pending_pr1b(self):
-        with self.assertRaisesRegex(RuntimeError, "blocked_pending_pr1b"):
+    def test_complete_inputs_remain_blocked_pending_pr1c(self):
+        with self.assertRaisesRegex(RuntimeError, "blocked_pending_pr1c"):
             validate_protocol_inputs(self.complete_config())
 
     def test_manifest_role_mismatch_fails(self):
@@ -219,7 +219,7 @@ class PredictionProtocolTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "role mismatch.*cal"):
             validate_protocol_inputs(config)
 
-    def test_manifest_intersection_fails_before_pr1b_block(self):
+    def test_manifest_intersection_fails_before_pr1c_block(self):
         config = self.complete_config()
         frequency = json.loads(Path(config["frequency_manifest"]).read_text())
         test = json.loads(Path(config["test_manifest"]).read_text())
@@ -379,7 +379,7 @@ class PredictionProtocolTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "allow_legacy_protocol.*boolean"):
                     validate_protocol_inputs({"allow_legacy_protocol": value})
 
-    def test_nonlegacy_validates_counts_payload_before_pr1b_block(self):
+    def test_nonlegacy_validates_counts_payload_before_pr1c_block(self):
         config = self.complete_config()
         sidecar = Path(config["frequency_table"])
         payload = json.loads(sidecar.read_text())

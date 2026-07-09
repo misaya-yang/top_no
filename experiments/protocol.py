@@ -86,9 +86,10 @@ def _legacy_protocol(config: dict[str, Any]) -> dict[str, Any]:
 def validate_protocol_inputs(config: dict[str, Any]) -> dict[str, Any]:
     """Validate provenance before any model or dataset allocation.
 
-    PR-1a can validate artifact identity and manifest disjointness, but it does
-    not yet make evaluator positions manifest-driven. Consequently every
-    non-legacy request remains blocked after all available checks pass.
+    PR-1a validates artifact identity and manifest disjointness, while PR-1b
+    provides trusted split construction receipts and position selectors. The
+    evaluator does not yet bind those artifacts to the exact forwarded text,
+    so every non-legacy request remains blocked pending PR-1c.
     """
     legacy_flag = config.get("allow_legacy_protocol", False)
     if not isinstance(legacy_flag, bool):
@@ -149,6 +150,8 @@ def validate_protocol_inputs(config: dict[str, Any]) -> dict[str, Any]:
         )
 
     raise RuntimeError(
-        "blocked_pending_pr1b: provenance checks passed, but document-aware "
-        "split sampling is not implemented. Paper-grade execution remains blocked."
+        "blocked_pending_pr1c: provenance checks passed and deterministic split "
+        "construction is available, but evaluator text is not yet bound to a "
+        "split receipt and manifest-selected positions. Paper-grade execution "
+        "remains blocked."
     )

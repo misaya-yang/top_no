@@ -6,19 +6,19 @@ The full external review is stored in
 
 ## Current Stop Condition
 
-No paper-grade GPU run should be launched until PR-1 through PR-3 are complete.
-The current `experiments/eval_prediction_sets.py` path is a legacy link-test
-runner only because:
+No paper-grade GPU run should be launched until PR-1c through PR-3 are complete.
+PR-1a now provides immutable external frequency artifacts, and PR-1b provides
+deterministic split construction receipts and position selectors. The current
+`experiments/eval_prediction_sets.py` path remains blocked because:
 
-1. token counts are built from the same loaded text pool used for calibration
-   and evaluation;
-2. calibration/evaluation positions are consumed sequentially rather than drawn
+1. manifests are not yet bound to the exact text passed through the model;
+2. its legacy calibration/evaluation positions are consumed sequentially rather than drawn
    from disjoint document-level split manifests;
 3. the current gate compares a calibrated method against mostly uncalibrated
    baselines.
 
-The runner now refuses paper-grade execution unless `allow_legacy_protocol=true`
-is explicitly set for smoke tests.
+The runner refuses nonlegacy execution with `blocked_pending_pr1c`. Explicit
+`allow_legacy_protocol=true` remains available only for noncitable smoke tests.
 
 ## PR-0: Narrative And Legacy Guardrails
 
@@ -30,21 +30,42 @@ Status: mostly complete.
 - The Fable5 plan, stress spec, and repo reconciliation addendum live under
   `docs/fable5/`.
 
-## PR-1: Frequency Tables And Splits
+## PR-1a: Frequency Artifacts
 
-Create the protocol layer that makes conformal claims defensible:
+Status: complete.
 
-- `experiments/freq_table.py`: load or build token counts from `D_freq` only,
+- `experiments/freq_table.py` loads token counts from `D_freq` only,
   with content-hashed metadata and manifest-disjointness checks.
-- `experiments/splits.py`: document/cluster-level `D_tune`, `D_cal`, `D_test`
-  manifests with deterministic seeded sampling.
-- Replace the tiny eval-pool frequency buckets with corpus-scale log buckets and
-  method-side mass-quantile buckets.
-- Delete the inline `build_token_counts()` and sequential skip/take protocol
-  from `eval_prediction_sets.py`.
+- Downstream evaluators must reuse the exact referenced count artifact.
+- Nonlegacy requests fail before model allocation.
+
+## PR-1b: Deterministic Split Artifacts
+
+Status: complete after the PR-1b branch is merged.
+
+- Normalized 13-gram MinHash-LSH candidates followed by exact Jaccard `>= 0.8`
+  confirmation and deterministic connected components.
+- One canonical representative per cluster and salted 40/25/35 cluster-level
+  tune/cal/test assignment.
+- A cryptographic construction receipt binds source/input identity, cluster
+  namespace, every algorithm parameter, membership, salt/bands, and manifests.
+- `[G]` one-position-per-document and `[E]` stride-4 selectors preserve
+  document/cluster identity and use explicit target exclusions.
+
+## PR-1c: Manifest-To-Forward Binding
+
+- Require the PR-1b receipt in nonlegacy configs and verify all four manifests
+  share a trusted cluster namespace (or run cross-corpus near-duplicate checks
+  before rebuilding the frequency artifact).
+- Resolve frozen source text by manifest `doc_id` and verify content hashes.
+- Replace sequential skip/take with independent calibration/test forwards at
+  registered positions; record document/cluster/position and `[G]/[E]` labels.
+- Define tokenizer-specific eligibility without excluding EOS and fail rather
+  than silently dropping ineligible documents.
 
 Required tests: disjoint manifest tripwire, one-position-per-document
-determinism, and refusal on count/eval manifest intersection.
+determinism, exact receipt/text binding, and refusal on count/eval near-duplicate
+intersection.
 
 ## PR-2: Conformal Core And Methods Registry
 
