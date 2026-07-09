@@ -9,6 +9,7 @@ import re
 from pathlib import Path
 
 from transformers import AutoConfig, AutoTokenizer
+from transformers.utils.hub import cached_file
 
 from cross_corpus import bind_frequency_documents
 from freq_table import (
@@ -60,14 +61,31 @@ def main() -> None:
         if isinstance(tokenizer_init, dict)
         else None
     )
-    if tokenizer_revision != args.revision:
-        raise ValueError(
-            "tokenizer revision mismatch: "
-            f"tokenizer={tokenizer_revision!r} requested={args.revision!r}"
+    if tokenizer_revision is None:
+        tokenizer_config_path = cached_file(
+            tokenizer_id,
+            "tokenizer_config.json",
+            revision=args.revision,
+            cache_dir=args.cache_dir,
+            local_files_only=True,
         )
-    resolved_tokenizer_id, resolved_revision = runtime_tokenizer_identity(
-        tokenizer,
-    )
+        snapshot_dir = Path(tokenizer_config_path).resolve().parent
+        if snapshot_dir.name != args.revision or snapshot_dir.parent.name != "snapshots":
+            raise ValueError(
+                "tokenizer revision is unresolved: cached tokenizer_config.json "
+                "is not inside the requested immutable snapshot"
+            )
+        resolved_tokenizer_id, resolved_revision = runtime_tokenizer_identity(
+            tokenizer,
+            resolved_model_revision=args.revision,
+        )
+    else:
+        if tokenizer_revision != args.revision:
+            raise ValueError(
+                "tokenizer revision mismatch: "
+                f"tokenizer={tokenizer_revision!r} requested={args.revision!r}"
+            )
+        resolved_tokenizer_id, resolved_revision = runtime_tokenizer_identity(tokenizer)
     if resolved_tokenizer_id != tokenizer_id:
         raise ValueError(
             "tokenizer_id mismatch: "

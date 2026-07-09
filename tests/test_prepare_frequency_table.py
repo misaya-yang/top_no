@@ -87,8 +87,12 @@ class PrepareFrequencyTableTests(unittest.TestCase):
             prepare_frequency_table.AutoTokenizer,
             "from_pretrained",
             return_value=MissingTokenizerHash(),
+        ), patch.object(
+            prepare_frequency_table,
+            "cached_file",
+            return_value="/mutable/tokenizer_config.json",
         ):
-            with self.assertRaisesRegex(ValueError, "tokenizer revision mismatch"):
+            with self.assertRaisesRegex(ValueError, "tokenizer revision is unresolved"):
                 prepare_frequency_table.main()
 
     def test_offline_cli_builds_loadable_eos_aware_artifact_without_model_weights(self):
