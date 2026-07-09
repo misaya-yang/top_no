@@ -5,6 +5,6 @@
 - [x] Add failing tests for frequency- and entropy-Mondrian prediction groups.
 - [x] Implement the stable registry and immutable calibration result.
 - [x] Implement explicit calibration and prediction-set construction paths.
-- [x] Run targeted checks plus a reduced real-vocabulary smoke.
-- [ ] Obtain independent Critical/Important review.
+- [x] Run targeted/full local and server checks plus a real-vocabulary smoke.
+- [x] Obtain independent Critical/Important review.
 - [ ] Merge and push only after all checks pass.

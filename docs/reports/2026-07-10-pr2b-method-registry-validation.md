@@ -28,6 +28,15 @@ git diff --check                                          PASS
 python3 -m unittest discover tests                        161/161 PASS
 ```
 
+RTX 5090 server:
+
+```text
+python -m compileall experiments                          PASS
+for script in scripts/*.sh; do bash -n "$script"; done   PASS
+python -m unittest discover tests                         161 run, 160 PASS,
+                                                         1 MPS-only skip
+```
+
 The ten new method tests cover canonical registry membership, explicit
 implementation status, unknown/unavailable method rejection, C-margin/min-p
 equivalence, C-nu/C-margin equality at `kappa=0`, signed-kappa isolation, APS
@@ -47,3 +56,7 @@ The large supports are expected from only 19 synthetic calibration rows and
 are not empirical findings. This is strictly a device, vocabulary-shape, and
 finite-sample execution smoke; it is not paper evidence.
 
+Independent review found no Critical/Important issues. It separately checked
+calibration/test dither symmetry, APS boundary-only randomization, the `V` vs
+`N` Mondrian axes, unknown/vacuous groups, finite-sample `+inf`, and agreement
+between the mandatory registry and the frozen Fable5 method matrix.

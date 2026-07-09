@@ -312,7 +312,7 @@ class MethodRegistryTests(unittest.TestCase):
         targets = torch.tensor([0])
         with self.assertRaisesRegex(ValueError, "uniforms"):
             calibrate_method("c_margin", logits, targets, delta=0.5)
-        with self.assertRaisesRegex(ValueError, "uniforms.*\[0, 1\)"):
+        with self.assertRaisesRegex(ValueError, r"uniforms.*\[0, 1\)"):
             calibrate_method(
                 "c_margin",
                 logits,
