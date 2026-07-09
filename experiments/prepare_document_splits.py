@@ -8,8 +8,8 @@ import json
 from pathlib import Path
 
 from splits import (
-    SourceDocument,
     build_split_artifacts,
+    load_source_documents_jsonl,
     save_split_artifacts,
     split_receipt_sha256,
 )
@@ -31,30 +31,10 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def load_source_documents(path: Path) -> tuple[SourceDocument, ...]:
-    documents = []
-    with Path(path).open() as handle:
-        for line_number, line in enumerate(handle, start=1):
-            if not line.strip():
-                raise ValueError(f"blank JSONL row at line {line_number}")
-            try:
-                payload = json.loads(line)
-            except json.JSONDecodeError as exc:
-                raise ValueError(f"invalid JSON at line {line_number}: {exc.msg}") from exc
-            if not isinstance(payload, dict) or set(payload) != {"doc_id", "text"}:
-                raise ValueError(
-                    f"JSONL row {line_number} must contain exactly doc_id and text"
-                )
-            documents.append(
-                SourceDocument(doc_id=payload["doc_id"], text=payload["text"])
-            )
-    return tuple(documents)
-
-
 def main() -> None:
     args = parse_args()
     result = build_split_artifacts(
-        load_source_documents(Path(args.input_jsonl)),
+        load_source_documents_jsonl(Path(args.input_jsonl)),
         source=args.source,
         source_snapshot_sha256=args.source_snapshot_sha256,
         cluster_namespace_sha256=args.cluster_namespace_sha256,

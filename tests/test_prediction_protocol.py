@@ -40,8 +40,11 @@ if torch is not None:
     from splits import (  # noqa: E402
         DocumentManifest,
         ManifestDocument,
+        SourceDocument,
+        build_split_artifacts,
         manifest_sha256,
         save_manifest,
+        save_split_artifacts,
     )
 
 
@@ -86,18 +89,46 @@ class PredictionProtocolTests(unittest.TestCase):
 
     def complete_config(self):
         frequency_path, frequency = self.write_manifest("freq", "freq")
-        tune_path, _ = self.write_manifest("tune", "tune")
-        calibration_path, _ = self.write_manifest("cal", "cal")
-        test_path, _ = self.write_manifest("test", "test")
+        documents = tuple(
+            SourceDocument(
+                f"eval-doc-{index}",
+                " ".join(
+                    f"topic{index}-token{position}" for position in range(32)
+                ),
+            )
+            for index in range(40)
+        )
+        split_result = build_split_artifacts(
+            documents,
+            source="fixture",
+            source_snapshot_sha256=hashlib.sha256(b"fixture-snapshot").hexdigest(),
+            global_salt="fixture-global-salt",
+        )
+        self.assertTrue(
+            all(split_result.manifests[role].documents for role in ("tune", "cal", "test"))
+        )
+        receipt_path = save_split_artifacts(split_result, self.root / "split-artifacts")
+        document_path = self.root / "eval-documents.jsonl"
+        document_path.write_text(
+            "\n".join(
+                json.dumps({"doc_id": item.doc_id, "text": item.text})
+                for item in documents
+            )
+            + "\n"
+        )
         table_path = self.write_frequency_table(frequency)
         return {
             "allow_legacy_protocol": False,
             "model_revision": "model-commit",
             "frequency_table": str(table_path),
             "frequency_manifest": str(frequency_path),
-            "tune_manifest": str(tune_path),
-            "calibration_manifest": str(calibration_path),
-            "test_manifest": str(test_path),
+            "tune_manifest": str(receipt_path.parent / "tune_manifest.json"),
+            "calibration_manifest": str(receipt_path.parent / "cal_manifest.json"),
+            "test_manifest": str(receipt_path.parent / "test_manifest.json"),
+            "split_receipt": str(receipt_path),
+            "document_jsonl": str(document_path),
+            "calibration_position_salt": "fixture-calibration-salt",
+            "test_position_salt": "fixture-test-salt",
         }
 
     def test_legacy_protocol_is_explicitly_non_citable(self):
@@ -133,6 +164,10 @@ class PredictionProtocolTests(unittest.TestCase):
         self.assertIsNone(config["tune_manifest"])
         self.assertIsNone(config["calibration_manifest"])
         self.assertIsNone(config["test_manifest"])
+        self.assertIsNone(config["split_receipt"])
+        self.assertIsNone(config["document_jsonl"])
+        self.assertIsNone(config["calibration_position_salt"])
+        self.assertIsNone(config["test_position_salt"])
 
     def test_wikitext_uses_current_dataset_repository_id(self):
         rows = [
@@ -203,13 +238,40 @@ class PredictionProtocolTests(unittest.TestCase):
     def test_nonlegacy_protocol_lists_missing_inputs(self):
         with self.assertRaisesRegex(
             RuntimeError,
-            "frequency_table.*frequency_manifest.*tune_manifest.*calibration_manifest.*test_manifest",
+            "frequency_table.*frequency_manifest.*tune_manifest.*calibration_manifest.*test_manifest.*split_receipt.*document_jsonl.*calibration_position_salt.*test_position_salt",
         ):
             validate_protocol_inputs({"allow_legacy_protocol": False})
 
-    def test_complete_inputs_remain_blocked_pending_pr1c(self):
-        with self.assertRaisesRegex(RuntimeError, "blocked_pending_pr1c"):
+    def test_complete_inputs_advance_to_cross_corpus_cluster_block(self):
+        with self.assertRaisesRegex(RuntimeError, "blocked_pending_cross_corpus_cluster"):
             validate_protocol_inputs(self.complete_config())
+
+    def test_document_store_tampering_fails_before_cross_corpus_block(self):
+        config = self.complete_config()
+        document_path = Path(config["document_jsonl"])
+        rows = document_path.read_text().splitlines()
+        first = json.loads(rows[0])
+        first["text"] += " tampered"
+        rows[0] = json.dumps(first)
+        document_path.write_text("\n".join(rows) + "\n")
+
+        with self.assertRaisesRegex(ValueError, "input_documents_sha256"):
+            validate_protocol_inputs(config)
+
+    def test_calibration_and_test_position_salts_must_differ(self):
+        config = self.complete_config()
+        config["test_position_salt"] = config["calibration_position_salt"]
+
+        with self.assertRaisesRegex(ValueError, "position salts must differ"):
+            validate_protocol_inputs(config)
+
+    def test_position_salts_must_be_nonempty_strings(self):
+        for key in ("calibration_position_salt", "test_position_salt"):
+            with self.subTest(key=key):
+                config = self.complete_config()
+                config[key] = 123
+                with self.assertRaisesRegex(ValueError, "position salts.*strings"):
+                    validate_protocol_inputs(config)
 
     def test_manifest_role_mismatch_fails(self):
         config = self.complete_config()
@@ -219,7 +281,7 @@ class PredictionProtocolTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "role mismatch.*cal"):
             validate_protocol_inputs(config)
 
-    def test_manifest_intersection_fails_before_pr1c_block(self):
+    def test_manifest_intersection_fails_before_cross_corpus_block(self):
         config = self.complete_config()
         frequency = json.loads(Path(config["frequency_manifest"]).read_text())
         test = json.loads(Path(config["test_manifest"]).read_text())
@@ -379,7 +441,7 @@ class PredictionProtocolTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "allow_legacy_protocol.*boolean"):
                     validate_protocol_inputs({"allow_legacy_protocol": value})
 
-    def test_nonlegacy_validates_counts_payload_before_pr1c_block(self):
+    def test_nonlegacy_validates_counts_payload_before_cross_corpus_block(self):
         config = self.complete_config()
         sidecar = Path(config["frequency_table"])
         payload = json.loads(sidecar.read_text())

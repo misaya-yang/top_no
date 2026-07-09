@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from document_store import bind_split_documents
 from freq_table import (
     PROTOCOL_VERSION,
     load_frequency_table,
@@ -86,10 +87,10 @@ def _legacy_protocol(config: dict[str, Any]) -> dict[str, Any]:
 def validate_protocol_inputs(config: dict[str, Any]) -> dict[str, Any]:
     """Validate provenance before any model or dataset allocation.
 
-    PR-1a validates artifact identity and manifest disjointness, while PR-1b
-    provides trusted split construction receipts and position selectors. The
-    evaluator does not yet bind those artifacts to the exact forwarded text,
-    so every non-legacy request remains blocked pending PR-1c.
+    PR-1a validates frequency artifacts, PR-1b provides split receipts, and
+    PR-1c binds those receipts to exact source text and document-aware forward
+    helpers. Non-legacy requests remain blocked until D_freq/evaluation
+    near-duplicate disjointness has its own joint or cross-corpus proof.
     """
     legacy_flag = config.get("allow_legacy_protocol", False)
     if not isinstance(legacy_flag, bool):
@@ -97,12 +98,28 @@ def validate_protocol_inputs(config: dict[str, Any]) -> dict[str, Any]:
     if legacy_flag is True:
         return _legacy_protocol(config)
 
-    required = ["frequency_table", *_MANIFEST_CONFIG_ROLES, "model_revision"]
+    required = [
+        "frequency_table",
+        *_MANIFEST_CONFIG_ROLES,
+        "model_revision",
+        "split_receipt",
+        "document_jsonl",
+        "calibration_position_salt",
+        "test_position_salt",
+    ]
     missing = [key for key in required if not config.get(key)]
     if missing:
         raise RuntimeError(
             "Paper-grade protocol inputs are missing: " + ", ".join(missing)
         )
+    position_salts = (
+        config["calibration_position_salt"],
+        config["test_position_salt"],
+    )
+    if any(not isinstance(value, str) or not value.strip() for value in position_salts):
+        raise ValueError("calibration and test position salts must be non-empty strings")
+    if config["calibration_position_salt"] == config["test_position_salt"]:
+        raise ValueError("calibration and test position salts must differ")
 
     manifests = {}
     for config_key, expected_role in _MANIFEST_CONFIG_ROLES.items():
@@ -149,9 +166,19 @@ def validate_protocol_inputs(config: dict[str, Any]) -> dict[str, Any]:
             f"manifest={frequency_manifest_hash!r}"
         )
 
+    bind_split_documents(
+        Path(config["split_receipt"]),
+        Path(config["document_jsonl"]),
+        configured_manifests={
+            "tune": Path(config["tune_manifest"]),
+            "cal": Path(config["calibration_manifest"]),
+            "test": Path(config["test_manifest"]),
+        },
+    )
+
     raise RuntimeError(
-        "blocked_pending_pr1c: provenance checks passed and deterministic split "
-        "construction is available, but evaluator text is not yet bound to a "
-        "split receipt and manifest-selected positions. Paper-grade execution "
-        "remains blocked."
+        "blocked_pending_cross_corpus_cluster: frequency artifacts and evaluation "
+        "documents are individually bound, but D_freq and evaluation documents "
+        "do not yet share a joint cluster receipt or threshold-complete cross-corpus "
+        "near-duplicate proof. Paper-grade execution remains blocked."
     )

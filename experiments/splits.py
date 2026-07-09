@@ -243,7 +243,10 @@ def _require_sha256(value: str, field_name: str) -> None:
         )
 
 
-def _content_sha256(text: str) -> str:
+def content_sha256(text: str) -> str:
+    """Hash the exact raw UTF-8 text bytes recorded in manifests."""
+    if not isinstance(text, str):
+        raise ValueError("text must be a string")
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
@@ -345,7 +348,7 @@ def _validated_source_documents(
         ordered.append(document)
     if not ordered:
         raise ValueError("documents must not be empty")
-    return tuple(sorted(ordered, key=lambda item: (item.doc_id, _content_sha256(item.text))))
+    return tuple(sorted(ordered, key=lambda item: (item.doc_id, content_sha256(item.text))))
 
 
 def _cluster_id(
@@ -390,7 +393,7 @@ def cluster_documents_minhash_lsh(
     if num_perm <= 0 or lsh_bands <= 0 or num_perm % lsh_bands:
         raise ValueError("num_perm must be positive and divisible by lsh_bands")
 
-    content_hashes = tuple(_content_sha256(item.text) for item in ordered)
+    content_hashes = tuple(content_sha256(item.text) for item in ordered)
     shingle_sets = tuple(_shingle_hashes(item.text, shingle_size) for item in ordered)
     signatures = tuple(
         _minhash_signature(
@@ -484,12 +487,36 @@ def split_role_for_cluster(representative_doc_id: str, global_salt: str) -> str:
     raise AssertionError(f"unreachable split band: {band}")
 
 
-def _input_documents_sha256(documents: Sequence[SourceDocument]) -> str:
+def source_documents_sha256(documents: Sequence[SourceDocument]) -> str:
+    """Hash frozen source document IDs and raw UTF-8 content identities."""
     rows = [
-        {"doc_id": item.doc_id, "content_sha256": _content_sha256(item.text)}
+        {"doc_id": item.doc_id, "content_sha256": content_sha256(item.text)}
         for item in _validated_source_documents(documents)
     ]
     return hashlib.sha256(_canonical_json(rows)).hexdigest()
+
+
+def load_source_documents_jsonl(path: Path) -> tuple[SourceDocument, ...]:
+    """Load strict `{"doc_id", "text"}` JSONL without exposing text in errors."""
+    documents = []
+    with Path(path).open() as handle:
+        for line_number, line in enumerate(handle, start=1):
+            if not line.strip():
+                raise ValueError(f"blank JSONL row at line {line_number}")
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise ValueError(
+                    f"invalid JSON at line {line_number}: {exc.msg}"
+                ) from exc
+            if not isinstance(payload, dict) or set(payload) != {"doc_id", "text"}:
+                raise ValueError(
+                    f"JSONL row {line_number} must contain exactly doc_id and text"
+                )
+            documents.append(
+                SourceDocument(doc_id=payload["doc_id"], text=payload["text"])
+            )
+    return _validated_source_documents(documents)
 
 
 def _canonical_cluster_manifest(clusters: Sequence[DocumentCluster]) -> dict[str, object]:
@@ -572,7 +599,7 @@ def build_split_artifacts(
         source=source,
         source_snapshot_sha256=source_snapshot_sha256,
         cluster_namespace_sha256=namespace,
-        input_documents_sha256=_input_documents_sha256(ordered),
+        input_documents_sha256=source_documents_sha256(ordered),
         normalization_policy=NORMALIZATION_POLICY,
         shingle_size=shingle_size,
         jaccard_threshold=float(jaccard_threshold),

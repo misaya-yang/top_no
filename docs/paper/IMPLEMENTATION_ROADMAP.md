@@ -55,14 +55,26 @@ Status: complete after the PR-1b branch is merged.
 
 ## PR-1c: Manifest-To-Forward Binding
 
-- Require the PR-1b receipt in nonlegacy configs and verify all four manifests
-  share a trusted cluster namespace (or run cross-corpus near-duplicate checks
-  before rebuilding the frequency artifact).
-- Resolve frozen source text by manifest `doc_id` and verify content hashes.
-- Replace sequential skip/take with independent calibration/test forwards at
-  registered positions; record document/cluster/position and `[G]/[E]` labels.
-- Define tokenizer-specific eligibility without excluding EOS and fail rather
-  than silently dropping ineligible documents.
+Status: exact text binding and the lower-level `[G]` forward are complete.
+
+- Nonlegacy configs require the PR-1b receipt, frozen source JSONL, and distinct
+  calibration/test position salts.
+- Source documents are bound by semantic input hash, manifest `doc_id`, and raw
+  UTF-8 content hash before any model allocation.
+- The document-aware forward consumes prefix-only context windows, never feeds
+  the target token, and carries document/cluster/position metadata.
+- Calibration/test manifests and salts produce independent model calls; the
+  legacy sequential skip/take path is not used by this lower-level API.
+
+## PR-1d: Cross-Corpus Near-Duplicate Proof
+
+- Build a joint four-way construction receipt or a threshold-complete
+  cross-corpus disjointness receipt binding the frequency manifest and eval
+  split receipt.
+- Rebuild the frequency manifest/table if cross-corpus clustering changes the
+  retained `D_freq` documents.
+- Keep normal nonlegacy execution at `blocked_pending_cross_corpus_cluster`
+  until this proof exists. Even then, PR-2/PR-3 are required for paper evidence.
 
 Required tests: disjoint manifest tripwire, one-position-per-document
 determinism, exact receipt/text binding, and refusal on count/eval near-duplicate

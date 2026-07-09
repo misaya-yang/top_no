@@ -26,6 +26,7 @@ from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from conformal import conformal_quantile, nu_nonconformity
+from document_store import BoundDocument
 from freq_table import (
     FrequencyTableMetadata,
     load_frequency_table,
@@ -34,6 +35,11 @@ from freq_table import (
 )
 from protocol import effective_config_sha256, validate_protocol_inputs
 from samplers import get_keep_mask
+from splits import (
+    ManifestDocument,
+    SelectedPosition,
+    select_guarantee_positions,
+)
 
 
 BUCKETS = [
@@ -131,6 +137,13 @@ class MethodStats:
         }
 
 
+@dataclass(frozen=True)
+class DocumentPositionLogitsBatch:
+    logits: torch.Tensor
+    targets: torch.Tensor
+    selections: tuple[SelectedPosition, ...]
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
     p.add_argument("--config", type=str, default=None)
@@ -160,6 +173,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--tune-manifest", type=str, default=None)
     p.add_argument("--calibration-manifest", type=str, default=None)
     p.add_argument("--test-manifest", type=str, default=None)
+    p.add_argument("--split-receipt", type=str, default=None)
+    p.add_argument("--document-jsonl", type=str, default=None)
+    p.add_argument("--calibration-position-salt", type=str, default=None)
+    p.add_argument("--test-position-salt", type=str, default=None)
     p.add_argument("--trust-remote-code", action="store_true")
     p.add_argument(
         "--allow-legacy-protocol",
@@ -200,6 +217,10 @@ def load_config(path: str | None) -> dict[str, Any]:
         "tune_manifest": None,
         "calibration_manifest": None,
         "test_manifest": None,
+        "split_receipt": None,
+        "document_jsonl": None,
+        "calibration_position_salt": None,
+        "test_position_salt": None,
     }
     if path:
         with open(path) as f:
@@ -437,6 +458,109 @@ def default_methods(config: dict[str, Any], q_hat: float) -> list[dict[str, Any]
             "kwargs": {"kappa": kappa, "q_hat": q_hat, "alpha": float(config["alpha"])},
         },
     ]
+
+
+def batch_document_position_logits(
+    model,
+    tokenizer,
+    documents: tuple[BoundDocument, ...] | list[BoundDocument],
+    config: dict[str, Any],
+    device: torch.device,
+    *,
+    position_salt: str,
+    excluded_target_ids: tuple[int, ...] | set[int] = (),
+):
+    """Yield one prefix-only next-token row per bound document for [G] runs."""
+    if not documents:
+        raise ValueError("documents must not be empty")
+    if any(not isinstance(document, BoundDocument) for document in documents):
+        raise ValueError("documents must contain BoundDocument values")
+    roles = {document.role for document in documents}
+    if len(roles) != 1:
+        raise ValueError("documents must come from a single manifest role")
+    doc_ids = [document.doc_id for document in documents]
+    if len(set(doc_ids)) != len(doc_ids):
+        raise ValueError("documents contain duplicate doc_id values")
+    batch_size = int(config["batch_size"])
+    max_context = int(config["max_length"])
+    if batch_size <= 0 or max_context <= 0:
+        raise ValueError("batch_size and max_length must be positive")
+    pad_token_id = getattr(tokenizer, "pad_token_id", None)
+    if isinstance(pad_token_id, bool) or not isinstance(pad_token_id, int):
+        raise ValueError("tokenizer.pad_token_id must be an integer")
+
+    ordered = tuple(sorted(documents, key=lambda item: item.doc_id))
+    for start in range(0, len(ordered), batch_size):
+        document_batch = ordered[start : start + batch_size]
+        encoded = tokenizer(
+            [document.text for document in document_batch],
+            add_special_tokens=False,
+            truncation=False,
+            padding=False,
+        )
+        raw_input_ids = encoded.get("input_ids")
+        if isinstance(raw_input_ids, torch.Tensor):
+            raw_input_ids = raw_input_ids.detach().cpu().tolist()
+        if not isinstance(raw_input_ids, list) or len(raw_input_ids) != len(document_batch):
+            raise ValueError("tokenizer returned malformed input_ids")
+        token_ids_by_doc = {
+            document.doc_id: tuple(token_ids)
+            for document, token_ids in zip(document_batch, raw_input_ids)
+        }
+        manifest_documents = tuple(
+            ManifestDocument(
+                document.doc_id,
+                document.content_sha256,
+                document.cluster_id,
+            )
+            for document in document_batch
+        )
+        selections = select_guarantee_positions(
+            manifest_documents,
+            token_ids_by_doc,
+            salt=position_salt,
+            excluded_target_ids=excluded_target_ids,
+        )
+        prefixes = []
+        targets = []
+        for selection in selections:
+            token_ids = token_ids_by_doc[selection.doc_id]
+            target_index = selection.target_index
+            prefix = token_ids[max(0, target_index - max_context) : target_index]
+            if not prefix:
+                raise ValueError(
+                    f"empty prefix for selected doc_id={selection.doc_id!r}"
+                )
+            prefixes.append(prefix)
+            targets.append(token_ids[target_index])
+
+        width = max(len(prefix) for prefix in prefixes)
+        padded_ids = []
+        attention_rows = []
+        for prefix in prefixes:
+            padding = width - len(prefix)
+            padded_ids.append([pad_token_id] * padding + list(prefix))
+            attention_rows.append([0] * padding + [1] * len(prefix))
+        input_ids = torch.tensor(padded_ids, dtype=torch.long, device=device)
+        attention_mask = torch.tensor(
+            attention_rows,
+            dtype=torch.long,
+            device=device,
+        )
+        position_ids = attention_mask.cumsum(dim=-1) - 1
+        position_ids.masked_fill_(attention_mask == 0, 0)
+        with torch.no_grad():
+            output = model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+            )
+        logits = output.logits[:, -1, :]
+        yield DocumentPositionLogitsBatch(
+            logits=logits,
+            targets=torch.tensor(targets, dtype=torch.long, device=device),
+            selections=selections,
+        )
 
 
 def batch_position_logits(model, tokenizer, texts: list[str], config: dict[str, Any], device: torch.device):
