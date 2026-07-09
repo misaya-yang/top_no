@@ -21,6 +21,8 @@ from conformal import (
     conformal_quantile,
     descending_order,
     dither_scores,
+    logprob_nonconformity,
+    logprob_scores,
     margin_nonconformity,
     margin_scores,
     mondrian_quantiles,
@@ -58,7 +60,7 @@ class MethodCalibration:
 _REGISTRY = (
     MethodDefinition("c_margin", "margin", "none", "null", "score_dither", True),
     MethodDefinition(
-        "c_logprob", "log_probability", "none", "baseline", "score_dither", False
+        "c_logprob", "log_probability", "none", "baseline", "score_dither", True
     ),
     MethodDefinition(
         "c_zmargin",
@@ -255,6 +257,8 @@ def _target_scores(
             kappa=params["kappa"],
             alpha=params["alpha"],
         )
+    elif method_key == "c_logprob":
+        scores = logprob_nonconformity(logits, target_ids)
     else:
         scores = margin_nonconformity(logits, target_ids)
     rows = torch.arange(target_ids.shape[0], device=target_ids.device)
@@ -356,6 +360,8 @@ def _candidate_scores(
             kappa=params["kappa"],
             alpha=params["alpha"],
         )
+    elif calibration.method_key == "c_logprob":
+        scores = logprob_scores(logits)
     else:
         scores = margin_scores(logits)
     if calibration.dither_epsilon is None:

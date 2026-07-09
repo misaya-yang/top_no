@@ -81,6 +81,43 @@ def margin_nonconformity(
     return maximum - targets
 
 
+def _logprob_working_logits(logits: torch.Tensor) -> torch.Tensor:
+    """Use fp32 accumulation for low-precision logits and preserve fp64."""
+    return logits if logits.dtype == torch.float64 else logits.float()
+
+
+def logprob_scores(logits: torch.Tensor) -> torch.Tensor:
+    """Return C-logprob nonconformity ``-log p_i`` for every token."""
+    _validate_logits(logits)
+    working = _logprob_working_logits(logits)
+    row_max = working.max(dim=-1, keepdim=True).values
+    centered = working - row_max
+    return torch.logsumexp(centered, dim=-1, keepdim=True) - centered
+
+
+def logprob_nonconformity(
+    logits: torch.Tensor,
+    target_ids: torch.Tensor,
+) -> torch.Tensor:
+    """Return the C-logprob score of each observed target without an N×V score."""
+    _validate_logits(logits)
+    _validate_target_ids(logits, target_ids)
+    accumulation_dtype = torch.float64 if logits.dtype == torch.float64 else torch.float32
+    row_max = logits.max(dim=-1).values.to(accumulation_dtype)
+    exp_sum = torch.zeros_like(row_max)
+    chunk_size = 4096
+    for start in range(0, logits.shape[1], chunk_size):
+        chunk = logits[:, start : start + chunk_size].to(accumulation_dtype)
+        exp_sum += torch.exp(chunk - row_max.unsqueeze(-1)).sum(dim=-1)
+    centered_targets = (
+        logits.gather(-1, target_ids.unsqueeze(-1))
+        .squeeze(-1)
+        .to(accumulation_dtype)
+        - row_max
+    )
+    return torch.log(exp_sum) - centered_targets
+
+
 def _validate_nu_inputs(
     logits: torch.Tensor,
     token_freq_table: torch.Tensor,

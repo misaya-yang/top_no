@@ -109,8 +109,8 @@ corpus/table is still required before any paper-grade runner can execute.
 
 Status: PR-2a conformal-core implementation is complete. The first PR-2b
 registry slice supplies stable identities plus tensor-only execution for
-C-margin, APS, signed C-nu, frequency-Mondrian margin, and entropy-Mondrian
-margin. Remaining mandatory methods, runner integration, tuning artifacts,
+C-margin, C-logprob, APS, signed C-nu, frequency-Mondrian margin, and
+entropy-Mondrian margin. Remaining mandatory methods, runner integration, tuning artifacts,
 per-document evidence, and suffstats remain blocked.
 
 PR-2c now defines a strict, content-addressed per-position gate-evidence

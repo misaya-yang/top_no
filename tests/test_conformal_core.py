@@ -20,6 +20,8 @@ try:
         descending_order,
         margin_scores,
         margin_nonconformity,
+        logprob_nonconformity,
+        logprob_scores,
         mondrian_quantiles,
         nu_nonconformity,
     )
@@ -224,6 +226,51 @@ class ConformalCoreTests(unittest.TestCase):
 
         self.assertEqual(margin.tolist(), [2.0, 1.0])
         self.assertTrue(torch.equal(nu, margin))
+
+        with patch.object(
+            conformal,
+            "logprob_scores",
+            side_effect=AssertionError("full candidate scores were materialized"),
+        ), patch.object(
+            conformal,
+            "_logprob_working_logits",
+            side_effect=AssertionError("full fp32 working logits were materialized"),
+        ):
+            logprob = logprob_nonconformity(logits, target_ids)
+        expected = -torch.log_softmax(logits, dim=-1).gather(
+            -1, target_ids.unsqueeze(-1)
+        ).squeeze(-1)
+        self.assertTrue(torch.allclose(logprob, expected))
+
+    def test_c_logprob_scores_are_stable_negative_log_probabilities(self):
+        logits = torch.tensor([[0.0, -100.0]], dtype=torch.float16)
+        scores = logprob_scores(logits)
+
+        self.assertEqual(scores.dtype, torch.float32)
+        self.assertTrue(torch.isfinite(scores).all())
+        self.assertTrue(torch.allclose(scores, torch.tensor([[0.0, 100.0]])))
+        shifted = logprob_scores(logits + 50.0)
+        self.assertTrue(torch.equal(scores, shifted))
+
+        for dtype, offset in (
+            (torch.float16, 60_000.0),
+            (torch.float32, 1e8),
+            (torch.float64, 1e16),
+        ):
+            with self.subTest(dtype=dtype):
+                equal_logits = torch.full((2, 3), offset, dtype=dtype)
+                expected = torch.full(
+                    (2, 3),
+                    math.log(3.0),
+                    dtype=torch.float64 if dtype == torch.float64 else torch.float32,
+                )
+                full = logprob_scores(equal_logits)
+                target = logprob_nonconformity(
+                    equal_logits,
+                    torch.tensor([0, 2]),
+                )
+                self.assertTrue(torch.allclose(full, expected, atol=1e-6))
+                self.assertTrue(torch.allclose(target, expected[:, 0], atol=1e-6))
 
     def test_c_margin_is_calibrated_min_p(self):
         torch.manual_seed(11)

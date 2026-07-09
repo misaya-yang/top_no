@@ -36,8 +36,9 @@ first calibrated prediction-set pipeline:
   sampler surface.
 - `experiments/conformal.py` contains the split-conformal scoring helpers.
 - `experiments/methods.py` assigns canonical registry keys to every planned
-  calibrated baseline and currently executes C-margin, APS, signed C-nu, and
-  frequency-/entropy-Mondrian margin through one tensor-only interface.
+  calibrated baseline and currently executes C-margin, C-logprob, APS, signed
+  C-nu, and frequency-/entropy-Mondrian margin through one tensor-only
+  interface.
 - `experiments/gate_evidence.py` defines the content-addressed per-position
   `[G]`/`[E]` handoff needed for paired document-clustered gate inference;
   aggregate legacy metrics cannot be loaded as this evidence type.

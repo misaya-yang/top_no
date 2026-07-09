@@ -50,6 +50,7 @@ class MethodRegistryTests(unittest.TestCase):
             implemented_method_keys(),
             {
                 "c_margin",
+                "c_logprob",
                 "aps",
                 "c_nu",
                 "entropy_mondrian_margin",
@@ -101,6 +102,29 @@ class MethodRegistryTests(unittest.TestCase):
                 keep,
                 get_keep_mask(test_logits, "min_p", p_min=math.exp(-2.0)),
             )
+        )
+
+    def test_c_logprob_calibrates_epsilon_probability_threshold(self):
+        torch.manual_seed(29)
+        calibration_logits = torch.randn(19, 13, dtype=torch.float64)
+        targets = torch.arange(19) % 13
+        fitted = calibrate_method(
+            "c_logprob",
+            calibration_logits,
+            targets,
+            delta=0.1,
+            uniforms=torch.zeros_like(calibration_logits),
+        )
+        test_logits = torch.randn(3, 13, dtype=torch.float64)
+        keep = prediction_set_mask(
+            fitted,
+            test_logits,
+            uniforms=torch.zeros_like(test_logits),
+        )
+        probabilities = torch.softmax(test_logits, dim=-1)
+
+        self.assertTrue(
+            torch.equal(keep, probabilities >= math.exp(-fitted.q_hat))
         )
 
     def test_c_nu_at_zero_matches_c_margin_end_to_end(self):
