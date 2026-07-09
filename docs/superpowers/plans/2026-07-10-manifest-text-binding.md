@@ -22,7 +22,7 @@
 
 ### Task 4: Review and integration
 
-- [ ] Update roadmap with the achieved boundary and remaining PR-1d work.
-- [ ] Run all tests/compile/shell checks locally and on the server.
-- [ ] Fix independent Critical/Important review findings.
+- [x] Update roadmap with the achieved boundary and remaining PR-1d work.
+- [x] Run all tests/compile/shell checks locally and on the server.
+- [x] Fix independent Critical/Important review findings.
 - [ ] Commit, push, merge to `main`, verify, and push.
