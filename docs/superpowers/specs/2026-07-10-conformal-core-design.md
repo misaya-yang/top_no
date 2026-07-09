@@ -52,7 +52,10 @@ insufficient to make that decision safely.
 `U in [0,1)`. The helper does not draw from global RNG. The later runner must
 derive frozen uniforms from stable document/position/token identities and apply
 the same randomized score definition to calibration targets and test
-candidates. Dithering calibration alone would break exchangeability.
+candidates. Dithering calibration alone would break exchangeability. MPS is
+rejected with a controlled error because it cannot represent float64; callers
+must explicitly move cached scores and uniforms to CPU rather than silently
+losing the dither in float32.
 
 APS has its own boundary randomization and does not silently add score dither:
 
@@ -70,7 +73,9 @@ randomized-boundary APS and are not claimed equivalent to deterministic top-p.
 ## Algebraic equivalences
 
 - C-margin keeps `s_max - s_i <= q`, exactly min-p with
-  `p_min = exp(-q)`.
+  `p_min = exp(-q)`. The shared min-p sampler evaluates this relation directly
+  in logit space so fp16 probability underflow cannot admit zero-probability
+  tail tokens.
 - C-nu at `kappa=0` is exactly C-margin.
 - Deterministic APS (`u=0`) is crossing-token top-p under one shared explicit
   order.

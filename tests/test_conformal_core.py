@@ -2,6 +2,7 @@ import math
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -9,6 +10,7 @@ sys.path.insert(0, str(ROOT / "experiments"))
 
 try:
     import torch
+    import conformal  # noqa: E402
     from conformal import (  # noqa: E402
         aps_nonconformity,
         aps_scores,
@@ -17,7 +19,9 @@ try:
         dither_scores,
         descending_order,
         margin_scores,
+        margin_nonconformity,
         mondrian_quantiles,
+        nu_nonconformity,
     )
     from samplers import get_keep_mask  # noqa: E402
 except ModuleNotFoundError:
@@ -96,6 +100,18 @@ class ConformalCoreTests(unittest.TestCase):
                         torch.zeros_like(scores),
                         epsilon=epsilon,
                     )
+
+    @unittest.skipUnless(
+        torch is not None
+        and torch.backends.mps.is_available()
+        and torch.backends.mps.is_built(),
+        "MPS is unavailable",
+    )
+    def test_dither_rejects_mps_with_controlled_cpu_guidance(self):
+        scores = torch.ones(2, device="mps")
+
+        with self.assertRaisesRegex(ValueError, "MPS.*move.*CPU"):
+            dither_scores(scores, torch.zeros(2))
 
     def test_mondrian_reports_counts_and_vacuous_small_groups(self):
         scores = torch.tensor([1.0, 2.0, 3.0, 4.0, 10.0, 11.0])
@@ -188,6 +204,27 @@ class ConformalCoreTests(unittest.TestCase):
             )
         )
 
+    def test_target_scores_do_not_materialize_full_candidate_scores(self):
+        logits = torch.tensor([[4.0, 2.0, 1.0], [1.0, 3.0, 2.0]])
+        target_ids = torch.tensor([1, 2])
+        frequencies = torch.tensor([10, 20, 30])
+
+        with patch.object(
+            conformal,
+            "margin_scores",
+            side_effect=AssertionError("full candidate scores were materialized"),
+        ):
+            margin = margin_nonconformity(logits, target_ids)
+            nu = nu_nonconformity(
+                logits,
+                target_ids,
+                frequencies,
+                kappa=0.0,
+            )
+
+        self.assertEqual(margin.tolist(), [2.0, 1.0])
+        self.assertTrue(torch.equal(nu, margin))
+
     def test_c_margin_is_calibrated_min_p(self):
         torch.manual_seed(11)
         logits = torch.randn(8, 31, dtype=torch.float64)
@@ -200,6 +237,20 @@ class ConformalCoreTests(unittest.TestCase):
             p_min=math.exp(-q_hat),
         )
 
+        self.assertTrue(torch.equal(conformal_keep, min_p_keep))
+
+    def test_c_margin_min_p_equivalence_survives_fp16_underflow(self):
+        logits = torch.tensor([[0.0, -100.0]], dtype=torch.float16)
+        q_hat = 20.0
+
+        conformal_keep = margin_scores(logits) <= q_hat
+        min_p_keep = get_keep_mask(
+            logits,
+            "min_p",
+            p_min=math.exp(-q_hat),
+        )
+
+        self.assertEqual(conformal_keep.tolist(), [[True, False]])
         self.assertTrue(torch.equal(conformal_keep, min_p_keep))
 
     def test_deterministic_aps_is_nucleus_with_crossing_token(self):
@@ -215,6 +266,24 @@ class ConformalCoreTests(unittest.TestCase):
         ) <= threshold
         nucleus_keep = get_keep_mask(logits, "top_p", p=threshold)
 
+        self.assertTrue(torch.equal(aps_keep, nucleus_keep))
+
+    def test_aps_top_p_equivalence_survives_fp16_boundary_rounding(self):
+        logits = torch.tensor(
+            [[5.79296875, -7.75390625, 4.40625]],
+            dtype=torch.float16,
+        )
+        threshold = 0.8
+        order = descending_order(logits)
+
+        aps_keep = aps_scores(
+            logits,
+            order=order,
+            uniforms=torch.zeros_like(logits),
+        ) <= threshold
+        nucleus_keep = get_keep_mask(logits, "top_p", p=threshold)
+
+        self.assertEqual(nucleus_keep.tolist(), [[True, False, False]])
         self.assertTrue(torch.equal(aps_keep, nucleus_keep))
 
     def test_aps_target_scores_gather_full_scores(self):
@@ -249,7 +318,15 @@ class ConformalCoreTests(unittest.TestCase):
         self.assertEqual(float(right_scores[0, 1]), 0.0)
         self.assertGreater(float(right_scores[0, 0]), 0.0)
 
-    def test_aps_u_one_is_not_deterministic_nucleus(self):
+    def test_aps_rejects_non_permutation_orders(self):
+        logits = torch.tensor([[3.0, 2.0, 1.0]])
+        uniforms = torch.zeros_like(logits)
+        for order in (torch.tensor([[0, 0, 2]]), torch.tensor([[0, 1, 3]])):
+            with self.subTest(order=order.tolist()):
+                with self.assertRaisesRegex(ValueError, "permutation"):
+                    aps_scores(logits, order=order, uniforms=uniforms)
+
+    def test_aps_u_near_one_is_not_deterministic_nucleus(self):
         logits = torch.log(torch.tensor([[0.6, 0.3, 0.1]], dtype=torch.float64))
         order = torch.tensor([[0, 1, 2]])
         threshold = 0.8
@@ -259,14 +336,15 @@ class ConformalCoreTests(unittest.TestCase):
             order=order,
             uniforms=torch.zeros_like(logits),
         ) <= threshold
-        u_one = aps_scores(
+        near_one = torch.nextafter(torch.ones_like(logits), torch.zeros_like(logits))
+        u_near_one = aps_scores(
             logits,
             order=order,
-            uniforms=torch.ones_like(logits),
+            uniforms=near_one,
         ) <= threshold
 
         self.assertEqual(u_zero.tolist(), [[True, True, False]])
-        self.assertEqual(u_one.tolist(), [[True, False, False]])
+        self.assertEqual(u_near_one.tolist(), [[True, False, False]])
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ raw-logit interpretation across temperatures.
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import torch
@@ -40,7 +41,7 @@ def _top_p_keep_mask(logits: torch.Tensor, p: float) -> torch.Tensor:
         return torch.ones_like(logits, dtype=torch.bool)
 
     probs = F.softmax(logits, dim=-1)
-    sorted_idx = torch.argsort(probs, dim=-1, descending=True, stable=True)
+    sorted_idx = torch.argsort(logits, dim=-1, descending=True, stable=True)
     sorted_probs = probs.gather(-1, sorted_idx)
     cum_probs = sorted_probs.cumsum(dim=-1)
     remove = cum_probs > p
@@ -90,9 +91,18 @@ def get_keep_mask(
 
     elif strategy == "min_p":
         p_min = kwargs.get("p_min", 0.05)
-        probs = F.softmax(logits, dim=-1)
-        p_max = probs.max(dim=-1, keepdim=True).values
-        keep = probs >= p_min * p_max
+        if (
+            isinstance(p_min, bool)
+            or not isinstance(p_min, (int, float))
+            or not math.isfinite(float(p_min))
+            or p_min > 1
+        ):
+            raise ValueError("p_min must be a finite number no greater than 1")
+        if p_min <= 0:
+            keep = torch.ones_like(logits, dtype=torch.bool)
+        else:
+            s_max = logits.max(dim=-1, keepdim=True).values
+            keep = (s_max - logits) <= -math.log(float(p_min))
 
     elif strategy == "fixed_margin":
         margin = kwargs.get("margin", 3.0)

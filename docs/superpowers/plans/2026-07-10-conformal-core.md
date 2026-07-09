@@ -9,5 +9,5 @@
 - [x] Add APS scores with explicit order and boundary uniforms.
 - [x] Freeze stable top-p tie ordering and test crossing-token equivalence.
 - [x] Test C-margin/min-p and C-nu(0)/C-margin equivalence.
-- [ ] Obtain independent review and run local/server verification.
+- [x] Obtain independent review and run local/server verification.
 - [ ] Merge and push the reviewed slice.

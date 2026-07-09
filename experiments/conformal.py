@@ -76,7 +76,9 @@ def margin_nonconformity(
     """Return the C-margin score of each observed target token."""
     _validate_logits(logits)
     _validate_target_ids(logits, target_ids)
-    return margin_scores(logits).gather(-1, target_ids.unsqueeze(-1)).squeeze(-1)
+    maximum = logits.max(dim=-1).values
+    targets = logits.gather(-1, target_ids.unsqueeze(-1)).squeeze(-1)
+    return maximum - targets
 
 
 def _validate_nu_inputs(
@@ -148,9 +150,15 @@ def dither_scores(
     Callers own uniform generation so the same frozen score function can be
     applied to calibration targets and test candidates independent of batching.
     APS boundary uniforms are part of APS itself and should not be silently
-    combined with this second randomization.
+    combined with this second randomization. MPS callers must explicitly move
+    scores to CPU because MPS cannot represent the required float64 result.
     """
     _validate_score_tensor(scores, nonempty=False)
+    if scores.device.type == "mps":
+        raise ValueError(
+            "MPS does not support float64 score dithering; move scores and "
+            "uniforms to CPU explicitly"
+        )
     if not isinstance(uniforms, torch.Tensor) or uniforms.shape != scores.shape:
         raise ValueError("uniforms must be a tensor with the same shape as scores")
     if uniforms.is_complex() or not torch.isfinite(uniforms).all():
@@ -252,8 +260,11 @@ def _validate_order(logits: torch.Tensor, order: torch.Tensor) -> None:
         or order.is_complex()
     ):
         raise ValueError("order must be an integer tensor matching logits")
-    expected = torch.arange(logits.shape[1], device=order.device).expand_as(order)
-    if not torch.equal(torch.sort(order, dim=-1).values, expected):
+    if ((order < 0) | (order >= logits.shape[1])).any():
+        raise ValueError("each order row must be a token-ID permutation")
+    seen = torch.zeros_like(order, dtype=torch.bool)
+    seen.scatter_(-1, order, True)
+    if not seen.all():
         raise ValueError("each order row must be a token-ID permutation")
 
 
@@ -273,15 +284,17 @@ def aps_scores(
     if not isinstance(uniforms, torch.Tensor) or uniforms.shape != logits.shape:
         raise ValueError("uniforms must be a tensor matching logits")
     if uniforms.is_complex() or not torch.isfinite(uniforms).all():
-        raise ValueError("uniforms must be finite values in [0, 1]")
-    if ((uniforms < 0) | (uniforms > 1)).any():
-        raise ValueError("uniforms must be finite values in [0, 1]")
+        raise ValueError("uniforms must be finite values in [0, 1)")
+    if ((uniforms < 0) | (uniforms >= 1)).any():
+        raise ValueError("uniforms must be finite values in [0, 1)")
 
     order = order.to(device=logits.device)
     uniforms = uniforms.to(device=logits.device, dtype=logits.dtype)
     probabilities = torch.softmax(logits, dim=-1)
     sorted_probabilities = probabilities.gather(-1, order)
-    prefix_mass = sorted_probabilities.cumsum(dim=-1) - sorted_probabilities
+    cumulative_mass = sorted_probabilities.cumsum(dim=-1)
+    prefix_mass = torch.zeros_like(cumulative_mass)
+    prefix_mass[..., 1:] = cumulative_mass[..., :-1]
     sorted_uniforms = uniforms.gather(-1, order)
     sorted_scores = prefix_mass + sorted_uniforms * sorted_probabilities
     scores = torch.empty_like(sorted_scores)
