@@ -10,7 +10,7 @@ Local macOS:
 ```text
 python3 -m compileall experiments                         PASS
 for script in scripts/*.sh; do bash -n "$script"; done   PASS
-python3 -m unittest discover tests                        150/150 PASS
+python3 -m unittest discover tests                        151/151 PASS
 ```
 
 RTX 5090 server:
@@ -18,10 +18,8 @@ RTX 5090 server:
 ```text
 python -m compileall experiments                          PASS
 for script in scripts/*.sh; do bash -n "$script"; done   PASS
-python -m unittest discover tests                         initial 5a5c5e7:
-                                                         147 run, 146 PASS,
-                                                         1 MPS-only skip;
-                                                         repaired rerun pending
+python -m unittest discover tests                         151 run, 150 PASS,
+                                                         1 MPS-only skip
 ```
 
 ## Real Qwen2.5-7B tokenizer smoke
@@ -51,8 +49,10 @@ tokenizer length and verifies the one-EOS-per-document policy with the real
 tokenizer. The two-document artifact is a functional smoke and is not paper
 evidence or a production frequency table.
 
-Independent review found and drove two fail-closed repairs: runtime expected
+Independent review found and drove three fail-closed repairs: runtime expected
 EOS IDs now reject bool/out-of-range values before equality comparison, and the
 CLI requires a 40-hex requested revision plus independently resolved matching
-commit hashes from both config and tokenizer. After repair, the reviewer found
-no remaining Critical/Important issues and passed the 150-test local suite.
+commit hashes from both config and tokenizer. The CLI also rejects mutable local
+model/tokenizer paths, including directories shaped like cached Hub snapshots,
+so they cannot masquerade as a pinned repo revision. After repair, the reviewer
+found no remaining Critical/Important issues and passed the full local suite.
