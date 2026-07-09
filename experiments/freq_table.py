@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Collection
@@ -41,6 +42,20 @@ def special_token_ids(tokenizer: Any) -> tuple[int, ...]:
             }
         )
     )
+
+
+def runtime_tokenizer_identity(tokenizer: Any) -> tuple[str, str | None]:
+    """Return the tokenizer ID and resolved Hub commit exposed at runtime."""
+    tokenizer_id = getattr(tokenizer, "name_or_path", None)
+    if not isinstance(tokenizer_id, str) or not tokenizer_id.strip():
+        raise ValueError("runtime tokenizer_id is unavailable")
+    init_kwargs = getattr(tokenizer, "init_kwargs", None)
+    revision = init_kwargs.get("_commit_hash") if isinstance(init_kwargs, dict) else None
+    if revision is not None and (
+        not isinstance(revision, str) or not revision.strip()
+    ):
+        raise ValueError("runtime tokenizer_revision must be a non-empty string")
+    return tokenizer_id, revision
 
 
 def _canonical_json(payload: object) -> bytes:
@@ -118,6 +133,55 @@ def _artifact_id(metadata: FrequencyTableMetadata) -> str:
     return hashlib.sha256(_canonical_json(_metadata_dict(metadata))).hexdigest()
 
 
+def _require_string(value: object, field_name: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{field_name} must be a non-empty string")
+    return value
+
+
+def _require_integer(value: object, field_name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{field_name} must be an integer")
+    return value
+
+
+def _require_sha256(value: object, field_name: str) -> str:
+    value = _require_string(value, field_name)
+    if re.fullmatch(r"[0-9a-f]{64}", value) is None:
+        raise ValueError(
+            f"{field_name} must be a canonical 64-character lowercase SHA-256 digest"
+        )
+    return value
+
+
+def _validate_metadata(metadata: FrequencyTableMetadata) -> None:
+    if metadata.protocol_version != PROTOCOL_VERSION:
+        raise ValueError(
+            f"protocol_version mismatch: artifact={metadata.protocol_version!r} "
+            f"expected={PROTOCOL_VERSION!r}"
+        )
+    _require_string(metadata.model_id, "model_id")
+    _require_string(metadata.tokenizer_id, "tokenizer_id")
+    if metadata.tokenizer_revision is not None:
+        _require_string(metadata.tokenizer_revision, "tokenizer_revision")
+    if _require_integer(metadata.vocab_size, "vocab_size") <= 0:
+        raise ValueError("vocab_size must be positive")
+    if metadata.counts_dtype != "torch.int64":
+        raise ValueError("counts_dtype must equal 'torch.int64'")
+    _require_sha256(metadata.counts_sha256, "counts_sha256")
+    _require_sha256(metadata.source_manifest_sha256, "source_manifest_sha256")
+    if _require_integer(metadata.num_documents, "num_documents") < 0:
+        raise ValueError("num_documents must be non-negative")
+    if _require_integer(metadata.num_tokens, "num_tokens") < 0:
+        raise ValueError("num_tokens must be non-negative")
+    normalized = _normalize_exclusion_ids(
+        metadata.exclusion_token_ids,
+        metadata.vocab_size,
+    )
+    if normalized != metadata.exclusion_token_ids:
+        raise ValueError("exclusion_token_ids must be sorted and unique")
+
+
 def make_frequency_table_metadata(
     counts: torch.Tensor,
     *,
@@ -130,15 +194,14 @@ def make_frequency_table_metadata(
 ) -> FrequencyTableMetadata:
     """Create metadata from validated counts and frozen source provenance."""
     canonical, exclusions = _canonicalize_for_artifact(counts, exclusion_token_ids)
-    if not model_id.strip():
-        raise ValueError("model_id must be non-empty")
-    if not tokenizer_id.strip():
-        raise ValueError("tokenizer_id must be non-empty")
-    if not source_manifest_sha256.strip():
-        raise ValueError("source_manifest_sha256 must be non-empty")
+    _require_string(model_id, "model_id")
+    _require_string(tokenizer_id, "tokenizer_id")
+    if tokenizer_revision is not None:
+        _require_string(tokenizer_revision, "tokenizer_revision")
+    _require_sha256(source_manifest_sha256, "source_manifest_sha256")
     if num_documents < 0:
         raise ValueError("num_documents must be non-negative")
-    return FrequencyTableMetadata(
+    metadata = FrequencyTableMetadata(
         protocol_version=PROTOCOL_VERSION,
         model_id=model_id,
         tokenizer_id=tokenizer_id,
@@ -151,6 +214,8 @@ def make_frequency_table_metadata(
         num_documents=num_documents,
         num_tokens=int(canonical.sum().item()),
     )
+    _validate_metadata(metadata)
+    return metadata
 
 
 def _validate_counts_against_metadata(
@@ -197,6 +262,7 @@ def save_frequency_table(
     )
     if exclusions != metadata.exclusion_token_ids:
         raise ValueError("exclusion_token_ids are not canonical")
+    _validate_metadata(metadata)
     canonical = _validate_counts_against_metadata(canonical, metadata)
     artifact_id = _artifact_id(metadata)
     output_dir = Path(output_dir)
@@ -236,26 +302,30 @@ def _metadata_from_dict(payload: object) -> FrequencyTableMetadata:
         raise ValueError(
             f"frequency-table metadata fields mismatch: missing={missing} extra={extra}"
         )
-    try:
-        return FrequencyTableMetadata(
-            protocol_version=str(payload["protocol_version"]),
-            model_id=str(payload["model_id"]),
-            tokenizer_id=str(payload["tokenizer_id"]),
-            tokenizer_revision=(
-                None
-                if payload["tokenizer_revision"] is None
-                else str(payload["tokenizer_revision"])
-            ),
-            vocab_size=int(payload["vocab_size"]),
-            counts_dtype=str(payload["counts_dtype"]),
-            counts_sha256=str(payload["counts_sha256"]),
-            source_manifest_sha256=str(payload["source_manifest_sha256"]),
-            exclusion_token_ids=tuple(payload["exclusion_token_ids"]),
-            num_documents=int(payload["num_documents"]),
-            num_tokens=int(payload["num_tokens"]),
-        )
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"Malformed frequency-table metadata: {exc}") from exc
+    revision = payload["tokenizer_revision"]
+    if revision is not None and not isinstance(revision, str):
+        raise ValueError("tokenizer_revision must be a string or null")
+    exclusions = payload["exclusion_token_ids"]
+    if not isinstance(exclusions, list):
+        raise ValueError("exclusion_token_ids must be a JSON array")
+    metadata = FrequencyTableMetadata(
+        protocol_version=_require_string(payload["protocol_version"], "protocol_version"),
+        model_id=_require_string(payload["model_id"], "model_id"),
+        tokenizer_id=_require_string(payload["tokenizer_id"], "tokenizer_id"),
+        tokenizer_revision=revision,
+        vocab_size=_require_integer(payload["vocab_size"], "vocab_size"),
+        counts_dtype=_require_string(payload["counts_dtype"], "counts_dtype"),
+        counts_sha256=_require_string(payload["counts_sha256"], "counts_sha256"),
+        source_manifest_sha256=_require_string(
+            payload["source_manifest_sha256"],
+            "source_manifest_sha256",
+        ),
+        exclusion_token_ids=tuple(exclusions),
+        num_documents=_require_integer(payload["num_documents"], "num_documents"),
+        num_tokens=_require_integer(payload["num_tokens"], "num_tokens"),
+    )
+    _validate_metadata(metadata)
+    return metadata
 
 
 def load_frequency_table_metadata(
@@ -297,10 +367,7 @@ def load_frequency_table_metadata(
 
 
 def _safe_torch_load(path: Path) -> object:
-    try:
-        return torch.load(path, map_location="cpu", weights_only=True)
-    except TypeError:
-        return torch.load(path, map_location="cpu")
+    return torch.load(path, map_location="cpu", weights_only=True)
 
 
 def load_frequency_table(
@@ -308,6 +375,7 @@ def load_frequency_table(
     *,
     expected_model_id: str,
     expected_tokenizer_id: str,
+    expected_tokenizer_revision: str | None,
     expected_vocab_size: int,
     expected_exclusion_token_ids: Collection[int],
 ) -> tuple[torch.Tensor, FrequencyTableMetadata]:
@@ -320,6 +388,10 @@ def load_frequency_table(
     checks = {
         "model_id": (metadata.model_id, expected_model_id),
         "tokenizer_id": (metadata.tokenizer_id, expected_tokenizer_id),
+        "tokenizer_revision": (
+            metadata.tokenizer_revision,
+            expected_tokenizer_revision,
+        ),
         "vocab_size": (metadata.vocab_size, expected_vocab_size),
         "exclusion_token_ids": (metadata.exclusion_token_ids, expected_exclusions),
     }
@@ -333,6 +405,10 @@ def load_frequency_table(
     loaded = _safe_torch_load(counts_path)
     if not isinstance(loaded, torch.Tensor):
         raise ValueError("counts file must contain a torch.Tensor")
+    if loaded.dtype != torch.int64:
+        raise ValueError(
+            f"serialized counts dtype must be torch.int64, got {loaded.dtype}"
+        )
     return _validate_counts_against_metadata(loaded, metadata), metadata
 
 
@@ -340,7 +416,9 @@ def load_frequency_table_from_metrics(
     metrics_path: Path,
     *,
     expected_model_id: str,
+    expected_model_revision: str,
     expected_tokenizer_id: str,
+    expected_tokenizer_revision: str | None,
     expected_vocab_size: int,
     expected_exclusion_token_ids: Collection[int],
 ) -> tuple[torch.Tensor, FrequencyTableMetadata]:
@@ -356,6 +434,18 @@ def load_frequency_table_from_metrics(
         raise RuntimeError(
             "prediction_set_metrics does not reference a frequency_table artifact; "
             "downstream runs may not rebuild counts"
+        )
+    metrics_model = metrics.get("model")
+    metrics_revision = metrics.get("model_revision")
+    if metrics_model != expected_model_id:
+        raise ValueError(
+            f"model_id mismatch between metrics and runtime: "
+            f"metrics={metrics_model!r} runtime={expected_model_id!r}"
+        )
+    if metrics_revision != expected_model_revision:
+        raise ValueError(
+            f"model_revision mismatch between metrics and runtime: "
+            f"metrics={metrics_revision!r} runtime={expected_model_revision!r}"
         )
     required = {
         "metadata_path",
@@ -391,6 +481,7 @@ def load_frequency_table_from_metrics(
         metadata_path,
         expected_model_id=expected_model_id,
         expected_tokenizer_id=expected_tokenizer_id,
+        expected_tokenizer_revision=expected_tokenizer_revision,
         expected_vocab_size=expected_vocab_size,
         expected_exclusion_token_ids=expected_exclusion_token_ids,
     )

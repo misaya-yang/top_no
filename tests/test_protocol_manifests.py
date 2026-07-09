@@ -1,3 +1,4 @@
+import hashlib
 import json
 import sys
 import tempfile
@@ -26,7 +27,7 @@ def manifest(role: str, suffix: str) -> DocumentManifest:
         documents=(
             ManifestDocument(
                 doc_id=f"doc-{suffix}",
-                content_sha256=f"content-{suffix}",
+                content_sha256=hashlib.sha256(f"content-{suffix}".encode()).hexdigest(),
                 cluster_id=f"cluster-{suffix}",
             ),
         ),
@@ -82,7 +83,11 @@ class ProtocolManifestTests(unittest.TestCase):
 
     def test_doc_id_intersection_fails(self):
         left = manifest("freq", "same")
-        right_doc = ManifestDocument("doc-same", "other-content", "other-cluster")
+        right_doc = ManifestDocument(
+            "doc-same",
+            hashlib.sha256(b"other-content").hexdigest(),
+            "other-cluster",
+        )
         right = DocumentManifest("icml2027-pr1a", "test", "fixture", (right_doc,))
 
         with self.assertRaisesRegex(ValueError, "doc_id"):
@@ -90,7 +95,11 @@ class ProtocolManifestTests(unittest.TestCase):
 
     def test_content_intersection_fails(self):
         left = manifest("freq", "same")
-        right_doc = ManifestDocument("other-doc", "content-same", "other-cluster")
+        right_doc = ManifestDocument(
+            "other-doc",
+            left.documents[0].content_sha256,
+            "other-cluster",
+        )
         right = DocumentManifest("icml2027-pr1a", "test", "fixture", (right_doc,))
 
         with self.assertRaisesRegex(ValueError, "content_sha256"):
@@ -98,11 +107,27 @@ class ProtocolManifestTests(unittest.TestCase):
 
     def test_cluster_intersection_fails(self):
         left = manifest("freq", "same")
-        right_doc = ManifestDocument("other-doc", "other-content", "cluster-same")
+        right_doc = ManifestDocument(
+            "other-doc",
+            hashlib.sha256(b"other-content").hexdigest(),
+            "cluster-same",
+        )
         right = DocumentManifest("icml2027-pr1a", "test", "fixture", (right_doc,))
 
         with self.assertRaisesRegex(ValueError, "cluster_id"):
             assert_pairwise_disjoint({"freq": left, "test": right})
+
+    def test_noncanonical_content_hash_is_rejected(self):
+        digest = manifest("freq", "same").documents[0].content_sha256
+        invalid = DocumentManifest(
+            "icml2027-pr1a",
+            "test",
+            "fixture",
+            (ManifestDocument("doc", digest.upper(), "cluster"),),
+        )
+
+        with self.assertRaisesRegex(ValueError, "content_sha256.*lowercase"):
+            manifest_sha256(invalid)
 
 
 if __name__ == "__main__":

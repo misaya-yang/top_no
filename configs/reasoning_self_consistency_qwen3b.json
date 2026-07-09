@@ -1,5 +1,6 @@
 {
   "model": "Qwen/Qwen2.5-3B",
+  "model_revision": "3aab1f1954e9cc14eb9509a215f9e5ca08227a9b",
   "datasets": ["gsm8k", "math500", "svamp"],
   "samples_per_question": 16,
   "n_questions": 500,

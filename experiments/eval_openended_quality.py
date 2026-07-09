@@ -15,7 +15,11 @@ import numpy as np
 import torch
 from datasets import load_dataset
 
-from eval_prediction_sets import load_model_and_tokenizer, resolve_device
+from eval_prediction_sets import (
+    load_model_and_tokenizer,
+    resolve_device,
+    validate_runtime_model_and_tokenizer,
+)
 from eval_reasoning_self_consistency import conformal_kwargs_from_metrics
 from freq_table import load_frequency_table_from_metrics, special_token_ids
 from samplers import batch_generate
@@ -25,6 +29,7 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
     p.add_argument("--config", type=str, default=None)
     p.add_argument("--model", type=str, default=None)
+    p.add_argument("--model-revision", type=str, default=None)
     p.add_argument("--datasets", nargs="+", default=None)
     p.add_argument("--n-prompts", type=int, default=None)
     p.add_argument("--samples-per-prompt", type=int, default=None)
@@ -46,6 +51,7 @@ def parse_args() -> argparse.Namespace:
 def load_config(path: str | None) -> dict[str, Any]:
     config = {
         "model": "Qwen/Qwen2.5-3B",
+        "model_revision": "3aab1f1954e9cc14eb9509a215f9e5ca08227a9b",
         "datasets": ["writingprompts", "alpacaeval_creative"],
         "n_prompts": 300,
         "samples_per_prompt": 4,
@@ -143,10 +149,17 @@ def build_counts_for_strategies(model, tokenizer, config: dict[str, Any]) -> tor
             "prediction_set_metrics with a frequency-table artifact is required; "
             "downstream runs may not rebuild counts"
         )
+    tokenizer_id, tokenizer_revision = validate_runtime_model_and_tokenizer(
+        model,
+        tokenizer,
+        config,
+    )
     counts, _ = load_frequency_table_from_metrics(
         Path(metrics_path),
         expected_model_id=config["model"],
-        expected_tokenizer_id=config.get("tokenizer_id") or config["model"],
+        expected_model_revision=config.get("model_revision"),
+        expected_tokenizer_id=tokenizer_id,
+        expected_tokenizer_revision=tokenizer_revision,
         expected_vocab_size=model.config.vocab_size,
         expected_exclusion_token_ids=special_token_ids(tokenizer),
     )
@@ -318,6 +331,7 @@ def main() -> None:
 
     results: dict[str, Any] = {
         "model": config["model"],
+        "model_revision": config.get("model_revision"),
         "datasets": {},
         "methods": list(methods),
         "samples_per_prompt": int(config["samples_per_prompt"]),

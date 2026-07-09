@@ -43,7 +43,7 @@ def _load_c4(n, max_len, seed):
 
 
 def _load_wikitext(n, max_len):
-    ds = load_dataset("wikitext", "wikitext-2-raw-v1", split="train",
+    ds = load_dataset("Salesforce/wikitext", "wikitext-2-raw-v1", split="train",
                       trust_remote_code=True)
     texts = []
     for item in ds:

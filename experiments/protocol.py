@@ -7,7 +7,11 @@ import json
 from pathlib import Path
 from typing import Any
 
-from freq_table import PROTOCOL_VERSION, load_frequency_table_metadata
+from freq_table import (
+    PROTOCOL_VERSION,
+    load_frequency_table,
+    load_frequency_table_metadata,
+)
 from splits import assert_pairwise_disjoint, load_manifest, manifest_sha256
 
 
@@ -86,10 +90,13 @@ def validate_protocol_inputs(config: dict[str, Any]) -> dict[str, Any]:
     not yet make evaluator positions manifest-driven. Consequently every
     non-legacy request remains blocked after all available checks pass.
     """
-    if config.get("allow_legacy_protocol"):
+    legacy_flag = config.get("allow_legacy_protocol", False)
+    if not isinstance(legacy_flag, bool):
+        raise ValueError("allow_legacy_protocol must be a boolean")
+    if legacy_flag is True:
         return _legacy_protocol(config)
 
-    required = ["frequency_table", *_MANIFEST_CONFIG_ROLES]
+    required = ["frequency_table", *_MANIFEST_CONFIG_ROLES, "model_revision"]
     missing = [key for key in required if not config.get(key)]
     if missing:
         raise RuntimeError(
@@ -112,7 +119,27 @@ def validate_protocol_inputs(config: dict[str, Any]) -> dict[str, Any]:
         manifests[expected_role] = manifest
     assert_pairwise_disjoint(manifests)
 
-    reference = _frequency_table_reference(config["frequency_table"])
+    metadata_path = Path(config["frequency_table"]).expanduser().resolve()
+    metadata, _, _ = load_frequency_table_metadata(metadata_path)
+    if metadata.tokenizer_revision is None:
+        raise ValueError(
+            "tokenizer_revision must be pinned for nonlegacy protocol inputs"
+        )
+    if metadata.tokenizer_revision != config["model_revision"]:
+        raise ValueError(
+            "tokenizer_revision mismatch between frequency artifact and "
+            f"model_revision: artifact={metadata.tokenizer_revision!r} "
+            f"model={config['model_revision']!r}"
+        )
+    load_frequency_table(
+        metadata_path,
+        expected_model_id=metadata.model_id,
+        expected_tokenizer_id=metadata.tokenizer_id,
+        expected_tokenizer_revision=metadata.tokenizer_revision,
+        expected_vocab_size=metadata.vocab_size,
+        expected_exclusion_token_ids=metadata.exclusion_token_ids,
+    )
+    reference = _frequency_table_reference(metadata_path)
     frequency_manifest_hash = manifest_sha256(manifests["freq"])
     if reference["source_manifest_sha256"] != frequency_manifest_hash:
         raise ValueError(

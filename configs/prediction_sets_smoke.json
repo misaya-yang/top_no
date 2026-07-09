@@ -1,5 +1,6 @@
 {
   "model": "gpt2",
+  "model_revision": "607a30d783dfa663caf39e06633721c8d4cfcd7e",
   "dataset": "wikitext",
   "split": "validation",
   "n_calibration": 64,

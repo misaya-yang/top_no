@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Mapping
@@ -49,6 +50,12 @@ def _validate_manifest(manifest: DocumentManifest) -> None:
                     f"{field_name}: {value!r}"
                 )
             seen.add(value)
+    for document in manifest.documents:
+        if re.fullmatch(r"[0-9a-f]{64}", document.content_sha256) is None:
+            raise ValueError(
+                "content_sha256 must be a canonical 64-character lowercase "
+                "hexadecimal digest"
+            )
 
 
 def _canonical_manifest_dict(manifest: DocumentManifest) -> dict[str, object]:

@@ -1,9 +1,11 @@
+import hashlib
 import json
 import os
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,6 +20,8 @@ if torch is not None:
     from eval_prediction_sets import (  # noqa: E402
         assert_protocol_is_allowed,
         load_config,
+        load_texts,
+        main as prediction_main,
         resolve_token_counts,
     )
     from eval_openended_quality import (  # noqa: E402
@@ -58,7 +62,9 @@ class PredictionProtocolTests(unittest.TestCase):
             documents=(
                 ManifestDocument(
                     doc_id=f"doc-{suffix}",
-                    content_sha256=f"content-{suffix}",
+                    content_sha256=hashlib.sha256(
+                        f"content-{suffix}".encode()
+                    ).hexdigest(),
                     cluster_id=f"cluster-{suffix}",
                 ),
             ),
@@ -70,8 +76,8 @@ class PredictionProtocolTests(unittest.TestCase):
         metadata = make_frequency_table_metadata(
             counts,
             model_id="fixture/model",
-            tokenizer_id="fixture/tokenizer",
-            tokenizer_revision="revision-1",
+            tokenizer_id="fixture/model",
+            tokenizer_revision="model-commit",
             source_manifest_sha256=source_hash or manifest_sha256(frequency_manifest),
             exclusion_token_ids=(1,),
             num_documents=1,
@@ -86,6 +92,7 @@ class PredictionProtocolTests(unittest.TestCase):
         table_path = self.write_frequency_table(frequency)
         return {
             "allow_legacy_protocol": False,
+            "model_revision": "model-commit",
             "frequency_table": str(table_path),
             "frequency_manifest": str(frequency_path),
             "tune_manifest": str(tune_path),
@@ -108,14 +115,47 @@ class PredictionProtocolTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "frequency_table"):
             assert_protocol_is_allowed({"allow_legacy_protocol": False})
 
+    def test_evaluator_blocks_before_model_allocation(self):
+        with patch("sys.argv", ["eval_prediction_sets.py"]), patch(
+            "eval_prediction_sets.load_model_and_tokenizer"
+        ) as mocked_load:
+            with self.assertRaisesRegex(RuntimeError, "frequency_table"):
+                prediction_main()
+
+        mocked_load.assert_not_called()
+
     def test_evaluator_config_declares_protocol_artifact_paths(self):
         config = load_config(None)
 
+        self.assertIsNone(config["model_revision"])
         self.assertIsNone(config["frequency_table"])
         self.assertIsNone(config["frequency_manifest"])
         self.assertIsNone(config["tune_manifest"])
         self.assertIsNone(config["calibration_manifest"])
         self.assertIsNone(config["test_manifest"])
+
+    def test_wikitext_uses_current_dataset_repository_id(self):
+        rows = [
+            {"text": "This is a sufficiently long fixture line for loading."},
+            {"text": "This is another sufficiently long fixture line."},
+        ]
+        config = {
+            "seed": 42,
+            "n_texts": 1,
+            "dataset": "wikitext",
+            "max_length": 32,
+            "split": "validation",
+        }
+
+        with patch("eval_prediction_sets.load_dataset", return_value=rows) as mocked:
+            loaded = load_texts(config)
+
+        self.assertEqual(len(loaded), 1)
+        mocked.assert_called_once_with(
+            "Salesforce/wikitext",
+            "wikitext-2-raw-v1",
+            split="validation",
+        )
 
     def test_evaluator_loads_external_counts_instead_of_rebuilding(self):
         _, frequency = self.write_manifest("freq", "freq")
@@ -123,9 +163,12 @@ class PredictionProtocolTests(unittest.TestCase):
 
         class Tokenizer:
             all_special_ids = [1]
+            name_or_path = "fixture/model"
+            init_kwargs = {"_commit_hash": "model-commit"}
 
         class ModelConfig:
             vocab_size = 3
+            _commit_hash = "model-commit"
 
         class Model:
             config = ModelConfig()
@@ -135,7 +178,7 @@ class PredictionProtocolTests(unittest.TestCase):
             Model(),
             {
                 "model": "fixture/model",
-                "tokenizer_id": "fixture/tokenizer",
+                "model_revision": "model-commit",
                 "frequency_table": str(table_path),
                 "allow_legacy_protocol": True,
                 "max_length": 8,
@@ -205,7 +248,10 @@ class PredictionProtocolTests(unittest.TestCase):
             documents=tuple(ManifestDocument(**row) for row in raw["documents"]),
         )
         config["frequency_table"] = str(
-            self.write_frequency_table(frequency, source_hash="wrong-source-hash")
+            self.write_frequency_table(
+                frequency,
+                source_hash=hashlib.sha256(b"wrong-source").hexdigest(),
+            )
         )
 
         with self.assertRaisesRegex(ValueError, "source_manifest_sha256"):
@@ -243,6 +289,7 @@ class PredictionProtocolTests(unittest.TestCase):
             json.dumps(
                 {
                     "model": "fixture/model",
+                    "model_revision": "model-commit",
                     "protocol": protocol,
                     "q_hat": 2.0,
                     "kappa": 1.0,
@@ -256,7 +303,9 @@ class PredictionProtocolTests(unittest.TestCase):
         return load_frequency_table_from_metrics(
             metrics_path,
             expected_model_id="fixture/model",
-            expected_tokenizer_id="fixture/tokenizer",
+            expected_model_revision="model-commit",
+            expected_tokenizer_id="fixture/model",
+            expected_tokenizer_revision="model-commit",
             expected_vocab_size=3,
             expected_exclusion_token_ids=(1,),
         )
@@ -274,16 +323,19 @@ class PredictionProtocolTests(unittest.TestCase):
 
         class Tokenizer:
             all_special_ids = [1]
+            name_or_path = "fixture/model"
+            init_kwargs = {"_commit_hash": "model-commit"}
 
         class ModelConfig:
             vocab_size = 3
+            _commit_hash = "model-commit"
 
         class Model:
             config = ModelConfig()
 
         config = {
             "model": "fixture/model",
-            "tokenizer_id": "fixture/tokenizer",
+            "model_revision": "model-commit",
             "prediction_set_metrics": str(metrics_path),
         }
         for builder in (build_reasoning_counts, build_openended_counts):
@@ -320,6 +372,80 @@ class PredictionProtocolTests(unittest.TestCase):
         counts, _ = self.load_metrics_counts(metrics_path)
 
         self.assertEqual(counts.tolist(), [4, 0, 7])
+
+    def test_legacy_flag_must_be_an_explicit_boolean(self):
+        for value in ("false", 1, {}):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(ValueError, "allow_legacy_protocol.*boolean"):
+                    validate_protocol_inputs({"allow_legacy_protocol": value})
+
+    def test_nonlegacy_validates_counts_payload_before_pr1b_block(self):
+        config = self.complete_config()
+        sidecar = Path(config["frequency_table"])
+        payload = json.loads(sidecar.read_text())
+        (sidecar.parent / payload["counts_file"]).unlink()
+
+        with self.assertRaisesRegex(ValueError, "counts file is missing"):
+            validate_protocol_inputs(config)
+
+    def test_runtime_tokenizer_identity_cannot_be_spoofed_by_config(self):
+        _, frequency = self.write_manifest("freq", "freq")
+        table_path = self.write_frequency_table(frequency)
+
+        class Tokenizer:
+            all_special_ids = [1]
+            name_or_path = "other/model"
+            init_kwargs = {"_commit_hash": "model-commit"}
+
+        class ModelConfig:
+            vocab_size = 3
+            _commit_hash = "model-commit"
+
+        class Model:
+            config = ModelConfig()
+
+        with self.assertRaisesRegex(ValueError, "tokenizer_id"):
+            resolve_token_counts(
+                Tokenizer(),
+                Model(),
+                {
+                    "model": "fixture/model",
+                    "model_revision": "model-commit",
+                    "tokenizer_id": "fixture/model",
+                    "frequency_table": str(table_path),
+                    "allow_legacy_protocol": True,
+                },
+                texts=[],
+            )
+
+    def test_runtime_tokenizer_revision_must_match_artifact(self):
+        _, frequency = self.write_manifest("freq", "freq")
+        table_path = self.write_frequency_table(frequency)
+
+        class Tokenizer:
+            all_special_ids = [1]
+            name_or_path = "fixture/model"
+            init_kwargs = {"_commit_hash": "other-commit"}
+
+        class ModelConfig:
+            vocab_size = 3
+            _commit_hash = "model-commit"
+
+        class Model:
+            config = ModelConfig()
+
+        with self.assertRaisesRegex(ValueError, "tokenizer_revision"):
+            resolve_token_counts(
+                Tokenizer(),
+                Model(),
+                {
+                    "model": "fixture/model",
+                    "model_revision": "model-commit",
+                    "frequency_table": str(table_path),
+                    "allow_legacy_protocol": True,
+                },
+                texts=[],
+            )
 
 
 if __name__ == "__main__":

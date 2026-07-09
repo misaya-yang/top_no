@@ -29,6 +29,7 @@ from conformal import conformal_quantile, nu_nonconformity
 from freq_table import (
     FrequencyTableMetadata,
     load_frequency_table,
+    runtime_tokenizer_identity,
     special_token_ids,
 )
 from protocol import effective_config_sha256, validate_protocol_inputs
@@ -134,6 +135,7 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
     p.add_argument("--config", type=str, default=None)
     p.add_argument("--model", type=str, default=None)
+    p.add_argument("--model-revision", type=str, default=None)
     p.add_argument("--dataset", type=str, default=None,
                    choices=["wikitext", "c4", "local", "text_file"])
     p.add_argument("--text-file", type=str, default=None)
@@ -175,6 +177,7 @@ def parse_args() -> argparse.Namespace:
 def load_config(path: str | None) -> dict[str, Any]:
     config = {
         "model": "gpt2",
+        "model_revision": None,
         "dataset": "wikitext",
         "split": "validation",
         "n_calibration": 64,
@@ -253,18 +256,62 @@ def load_model_and_tokenizer(config: dict[str, Any], device: torch.device):
     dtype = resolve_dtype(config["dtype"], device)
     tokenizer = AutoTokenizer.from_pretrained(
         config["model"],
+        revision=config.get("model_revision"),
         trust_remote_code=config["trust_remote_code"],
     )
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     model = AutoModelForCausalLM.from_pretrained(
         config["model"],
+        revision=config.get("model_revision"),
         dtype=dtype,
         trust_remote_code=config["trust_remote_code"],
     )
     model.to(device)
     model.eval()
     return model, tokenizer
+
+
+def validate_runtime_model_and_tokenizer(
+    model,
+    tokenizer,
+    config: dict[str, Any],
+) -> tuple[str, str | None]:
+    """Bind runtime objects to the pinned model/tokenizer identity."""
+    expected_revision = config.get("model_revision")
+    model_revision = getattr(model.config, "_commit_hash", None)
+    if expected_revision is not None and model_revision != expected_revision:
+        raise ValueError(
+            f"model_revision mismatch: runtime={model_revision!r} "
+            f"expected={expected_revision!r}"
+        )
+    tokenizer_id, tokenizer_revision = runtime_tokenizer_identity(tokenizer)
+    if expected_revision is not None and tokenizer_revision != expected_revision:
+        raise ValueError(
+            f"tokenizer_revision mismatch: runtime={tokenizer_revision!r} "
+            f"expected={expected_revision!r}"
+        )
+    vocab_size = int(model.config.vocab_size)
+    if vocab_size <= 0:
+        raise ValueError("model vocab_size must be positive")
+    if hasattr(tokenizer, "__len__") and len(tokenizer) > vocab_size:
+        raise ValueError(
+            f"tokenizer size {len(tokenizer)} exceeds model vocab_size {vocab_size}"
+        )
+    input_embeddings = model.get_input_embeddings() if hasattr(model, "get_input_embeddings") else None
+    if input_embeddings is not None and input_embeddings.num_embeddings != vocab_size:
+        raise ValueError(
+            "input embedding size does not match model vocab_size: "
+            f"embeddings={input_embeddings.num_embeddings} config={vocab_size}"
+        )
+    output_embeddings = model.get_output_embeddings() if hasattr(model, "get_output_embeddings") else None
+    output_size = getattr(output_embeddings, "out_features", vocab_size)
+    if output_embeddings is not None and output_size != vocab_size:
+        raise ValueError(
+            "output embedding size does not match model vocab_size: "
+            f"output={output_size} config={vocab_size}"
+        )
+    return tokenizer_id, tokenizer_revision
 
 
 def estimate_n_texts(config: dict[str, Any]) -> int:
@@ -299,7 +346,11 @@ def load_texts(config: dict[str, Any]) -> list[str]:
         return load_text_samples(n_texts, max_length=max_chars, seed=int(config["seed"]))
 
     if dataset == "wikitext":
-        ds = load_dataset("wikitext", "wikitext-2-raw-v1", split=config["split"])
+        ds = load_dataset(
+            "Salesforce/wikitext",
+            "wikitext-2-raw-v1",
+            split=config["split"],
+        )
         texts = [item["text"].strip() for item in ds if len(item["text"].strip()) > 20]
         if len(texts) < n_texts:
             raise RuntimeError(f"wikitext has only {len(texts)} usable rows, need {n_texts}")
@@ -341,10 +392,16 @@ def resolve_token_counts(
 ) -> tuple[torch.Tensor, FrequencyTableMetadata | None]:
     """Load frozen counts, or use the explicit legacy smoke fallback."""
     if config.get("frequency_table"):
+        tokenizer_id, tokenizer_revision = validate_runtime_model_and_tokenizer(
+            model,
+            tokenizer,
+            config,
+        )
         return load_frequency_table(
             Path(config["frequency_table"]),
             expected_model_id=config["model"],
-            expected_tokenizer_id=config.get("tokenizer_id") or config["model"],
+            expected_tokenizer_id=tokenizer_id,
+            expected_tokenizer_revision=tokenizer_revision,
             expected_vocab_size=model.config.vocab_size,
             expected_exclusion_token_ids=special_token_ids(tokenizer),
         )
@@ -539,6 +596,7 @@ def main() -> None:
 
     summary = {
         "model": config["model"],
+        "model_revision": config.get("model_revision"),
         "dataset": config["dataset"],
         "split": config["split"],
         "n_positions": n_eval,

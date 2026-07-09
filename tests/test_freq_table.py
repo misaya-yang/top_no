@@ -1,8 +1,11 @@
+import hashlib
 import json
 import sys
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,7 +35,13 @@ def source_manifest():
         protocol_version="icml2027-pr1a",
         role="freq",
         source="fixture",
-        documents=(ManifestDocument("doc-f", "content-f", "cluster-f"),),
+        documents=(
+            ManifestDocument(
+                "doc-f",
+                hashlib.sha256(b"content-f").hexdigest(),
+                "cluster-f",
+            ),
+        ),
     )
 
 
@@ -53,6 +62,7 @@ class FrequencyTableTests(unittest.TestCase):
         expected = {
             "expected_model_id": "fixture/model",
             "expected_tokenizer_id": "fixture/tokenizer",
+            "expected_tokenizer_revision": "revision-1",
             "expected_vocab_size": 3,
             "expected_exclusion_token_ids": (1,),
         }
@@ -109,6 +119,7 @@ class FrequencyTableTests(unittest.TestCase):
             mismatches = [
                 ({"expected_model_id": "other/model"}, "model_id"),
                 ({"expected_tokenizer_id": "other/tokenizer"}, "tokenizer_id"),
+                ({"expected_tokenizer_revision": "other-revision"}, "tokenizer_revision"),
                 ({"expected_vocab_size": 4}, "vocab_size"),
                 ({"expected_exclusion_token_ids": ()}, "exclusion_token_ids"),
             ]
@@ -141,6 +152,60 @@ class FrequencyTableTests(unittest.TestCase):
             all_special_ids = [2, 0, 2, None, "1"]
 
         self.assertEqual(special_token_ids(Tokenizer()), (0, 2))
+
+    def test_metadata_types_are_not_coerced_before_identity_check(self):
+        counts = torch.tensor([4, 0, 7], dtype=torch.int64)
+        metadata = self.make_metadata(counts)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            sidecar = save_frequency_table(counts, metadata, Path(tmp))
+            payload = json.loads(sidecar.read_text())
+            payload["metadata"]["num_documents"] = 1.9
+            sidecar.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(ValueError, "num_documents.*integer"):
+                load_frequency_table_metadata(sidecar)
+
+            exact_string_metadata = replace(metadata, tokenizer_revision="1")
+            sidecar = save_frequency_table(counts, exact_string_metadata, Path(tmp))
+            payload = json.loads(sidecar.read_text())
+            payload["metadata"]["tokenizer_revision"] = 1
+            sidecar.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(ValueError, "tokenizer_revision.*string"):
+                load_frequency_table_metadata(sidecar)
+
+    def test_writer_rejects_other_protocol_versions(self):
+        counts = torch.tensor([4, 0, 7], dtype=torch.int64)
+        metadata = replace(self.make_metadata(counts), protocol_version="other-protocol")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaisesRegex(ValueError, "protocol_version"):
+                save_frequency_table(counts, metadata, Path(tmp))
+
+    def test_loader_rejects_serialized_float_tensor(self):
+        counts = torch.tensor([4, 0, 7], dtype=torch.int64)
+        metadata = self.make_metadata(counts)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            sidecar = save_frequency_table(counts, metadata, Path(tmp))
+            payload = json.loads(sidecar.read_text())
+            counts_path = sidecar.parent / payload["counts_file"]
+            torch.save(counts.float(), counts_path)
+            with self.assertRaisesRegex(ValueError, "serialized counts dtype"):
+                self.load(sidecar)
+
+    def test_safe_load_does_not_fallback_after_type_error(self):
+        counts = torch.tensor([4, 0, 7], dtype=torch.int64)
+        metadata = self.make_metadata(counts)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            sidecar = save_frequency_table(counts, metadata, Path(tmp))
+            with patch(
+                "freq_table.torch.load",
+                side_effect=TypeError("unsafe fixture"),
+            ) as mocked:
+                with self.assertRaisesRegex(TypeError, "unsafe fixture"):
+                    self.load(sidecar)
+            self.assertEqual(mocked.call_count, 1)
 
 
 if __name__ == "__main__":
