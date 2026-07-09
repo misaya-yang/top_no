@@ -13,8 +13,9 @@ do not edit generated `results/`; never label development output paper-grade.
 
 - [x] Add canonical construction receipt metadata without changing the PR-1a
       manifest wire schema.
-- [x] Add normalized 13-gram shingles, MinHash-LSH candidate generation,
-      exact Jaccard confirmation, union-find clusters, and canonical reps.
+- [x] Add normalized 13-gram shingles, MinHash-LSH plus threshold-complete
+      prefix candidates, exact Jaccard confirmation, union-find clusters, and
+      canonical reps.
 - [x] Add salted fixed-band role assignment and order-invariance tests.
 - [x] Test exact duplicates, near duplicates, threshold separation, and
       construction-parameter hash drift.

@@ -43,8 +43,9 @@ Status: complete.
 
 Status: complete after the PR-1b branch is merged.
 
-- Normalized 13-gram MinHash-LSH candidates followed by exact Jaccard `>= 0.8`
-  confirmation and deterministic connected components.
+- Normalized 13-gram MinHash-LSH plus threshold-complete prefix candidates,
+  followed by exact Jaccard `>= 0.8` confirmation and deterministic connected
+  components.
 - One canonical representative per cluster and salted 40/25/35 cluster-level
   tune/cal/test assignment.
 - A cryptographic construction receipt binds source/input identity, cluster

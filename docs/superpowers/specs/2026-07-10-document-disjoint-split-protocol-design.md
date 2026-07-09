@@ -12,11 +12,13 @@ runs or paper claims.
 
 - Input is JSONL with exactly one non-empty `doc_id` and `text` per row.
 - Exact content identity is SHA-256 over UTF-8 text bytes.
-- Near duplicates use normalized token 13-gram shingles, deterministic
-  MinHash-LSH candidates, and exact Jaccard confirmation at `>= 0.8`.
+- Near duplicates use normalized token 13-gram shingles, the union of
+  deterministic MinHash-LSH and threshold-complete prefix-index candidates,
+  and exact Jaccard confirmation at `>= 0.8`. The prefix index makes the
+  threshold decision free of LSH false negatives.
 - Near-duplicate connected components are clusters. Only the canonical
   representative (minimum `(content_sha256, doc_id)`) is retained.
-- The representative ID and a committed global salt are hashed into fixed
+- The canonical representative document ID and a committed global salt are hashed into fixed
   bands: tune `[0, 40)`, calibration `[40, 65)`, test `[65, 100)`.
 - Calibration and guarantee-grade test rows use exactly one target position
   per document. The target is drawn uniformly from token indices
@@ -63,6 +65,7 @@ and frequency/evaluation intersections all stop construction.
 
 - Split artifacts are identical under input reordering.
 - Exact and near duplicates cannot straddle roles.
+- An exact-threshold `J = 0.8` pair clusters even when it shares no LSH band.
 - Observed assignment follows the fixed 40/25/35 hash bands.
 - Receipt or manifest tampering fails closed.
 - One-position sampling is deterministic, in range, and approximately uniform

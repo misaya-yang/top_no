@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import unicodedata
 from dataclasses import asdict, dataclass
@@ -18,11 +19,11 @@ from typing import Collection, Mapping, Sequence
 
 
 SPLIT_CONSTRUCTION_VERSION = "icml2027-pr1b-v1"
-MINHASH_IMPLEMENTATION = "stdlib-splitmix64-v1"
-NORMALIZATION_POLICY = "unicode-nfkc-casefold-collapse-whitespace-v1"
+MINHASH_IMPLEMENTATION = "stdlib-splitmix64-lsh-plus-exact-prefix-v1"
+NORMALIZATION_POLICY = "unicode-nfkc-casefold-whitespace-short-doc-fallback-v2"
 REPRESENTATIVE_POLICY = "minimum-content-sha256-then-doc-id-v1"
 CLUSTER_ID_POLICY = "sha256-namespace-plus-sorted-unique-content-hashes-v1"
-SPLIT_HASH_POLICY = "sha256-domain-separated-cluster-mod-100-v1"
+SPLIT_HASH_POLICY = "sha256-domain-separated-representative-doc-id-mod-100-v1"
 SPLIT_BANDS = (("tune", 0, 40), ("cal", 40, 65), ("test", 65, 100))
 
 
@@ -255,11 +256,7 @@ def _shingle_hashes(text: str, shingle_size: int) -> frozenset[int]:
     tokens = _normalize_text(text)
     if not tokens:
         raise ValueError("source document text must contain a non-whitespace token")
-    if len(tokens) < shingle_size:
-        raise ValueError(
-            "source document must contain at least shingle_size normalized tokens"
-        )
-    width = shingle_size
+    width = min(shingle_size, len(tokens))
     shingles = []
     for index in range(len(tokens) - width + 1):
         payload = "\x1f".join(tokens[index : index + width]).encode("utf-8")
@@ -287,6 +284,27 @@ def _minhash_signature(
 
 def _jaccard(left: frozenset[int], right: frozenset[int]) -> float:
     return len(left & right) / len(left | right)
+
+
+def _exact_prefix_candidates(
+    shingle_sets: Sequence[frozenset[int]],
+    threshold: float,
+) -> set[tuple[int, int]]:
+    """Return a no-false-negative candidate superset for Jaccard thresholding.
+
+    For an earlier set A, its suffix after the indexed prefix contains fewer
+    than ceil(threshold * |A|) elements. Any later B with J(A, B) >= threshold
+    must therefore contain at least one indexed prefix element from A.
+    """
+    inverted: dict[int, list[int]] = {}
+    candidates: set[tuple[int, int]] = set()
+    for index, shingles in enumerate(shingle_sets):
+        for value in shingles:
+            candidates.update((previous, index) for previous in inverted.get(value, ()))
+        prefix_length = len(shingles) - math.ceil(threshold * len(shingles)) + 1
+        for value in sorted(shingles)[:prefix_length]:
+            inverted.setdefault(value, []).append(index)
+    return candidates
 
 
 class _UnionFind:
@@ -401,8 +419,15 @@ def cluster_documents_minhash_lsh(
             owners = buckets.setdefault(key, [])
             candidates.update((previous, index) for previous in owners)
             owners.append(index)
+    candidates.update(_exact_prefix_candidates(shingle_sets, threshold))
     for left, right in sorted(candidates):
         if content_hashes[left] == content_hashes[right]:
+            continue
+        if (
+            min(len(shingle_sets[left]), len(shingle_sets[right]))
+            / max(len(shingle_sets[left]), len(shingle_sets[right]))
+            < threshold
+        ):
             continue
         if _jaccard(shingle_sets[left], shingle_sets[right]) >= threshold:
             union_find.union(left, right)
@@ -442,11 +467,16 @@ def cluster_documents_minhash_lsh(
     return tuple(sorted(clusters, key=lambda item: item.cluster_id))
 
 
-def split_role_for_cluster(cluster_id: str, global_salt: str) -> str:
-    """Assign one cluster to the fixed tune/cal/test hash bands."""
-    _require_nonempty(cluster_id, "cluster_id")
+def split_role_for_cluster(representative_doc_id: str, global_salt: str) -> str:
+    """Assign a cluster via its canonical representative document ID."""
+    _require_nonempty(representative_doc_id, "representative_doc_id")
     _require_nonempty(global_salt, "global_salt")
-    payload = b"icml2027-split-v1\x00" + global_salt.encode() + b"\x00" + cluster_id.encode()
+    payload = (
+        b"icml2027-split-v1\x00"
+        + global_salt.encode()
+        + b"\x00"
+        + representative_doc_id.encode()
+    )
     band = int.from_bytes(hashlib.sha256(payload).digest(), "big") % 100
     for role, lower, upper in SPLIT_BANDS:
         if lower <= band < upper:
@@ -524,7 +554,7 @@ def build_split_artifacts(
         "test": [],
     }
     for cluster in clusters:
-        role = split_role_for_cluster(cluster.cluster_id, global_salt)
+        role = split_role_for_cluster(cluster.representative.doc_id, global_salt)
         documents_by_role[role].append(cluster.representative)
     manifests = {
         role: DocumentManifest(
@@ -616,6 +646,12 @@ def _validate_receipt(receipt: SplitBuildReceipt) -> None:
         raise ValueError("num_clusters cannot exceed num_input_documents")
     if len(receipt.manifest_sha256s) != 3:
         raise ValueError("manifest_sha256s must contain exactly three roles")
+    if tuple(role for role, _ in receipt.manifest_sha256s) != (
+        "tune",
+        "cal",
+        "test",
+    ):
+        raise ValueError("manifest_sha256s must use canonical role order")
     manifest_hashes = dict(receipt.manifest_sha256s)
     if set(manifest_hashes) != {"tune", "cal", "test"}:
         raise ValueError("manifest_sha256s must contain tune, cal, and test")
@@ -724,10 +760,30 @@ def _validate_cluster_manifest_payload(
     return representatives
 
 
+def _validate_split_role_assignments(
+    manifests: Mapping[str, DocumentManifest],
+    receipt: SplitBuildReceipt,
+) -> None:
+    for role in ("tune", "cal", "test"):
+        manifest = manifests[role]
+        for document in manifest.documents:
+            expected_role = split_role_for_cluster(
+                document.doc_id,
+                receipt.global_salt,
+            )
+            if expected_role != role:
+                raise ValueError(
+                    "split role mismatch: "
+                    f"doc_id={document.doc_id!r} recorded={role!r} "
+                    f"expected={expected_role!r}"
+                )
+
+
 def save_split_artifacts(result: SplitBuildArtifacts, output_dir: Path) -> Path:
     """Save role manifests, cluster membership, and a canonical receipt wrapper."""
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    _validate_split_role_assignments(result.manifests, result.receipt)
     expected_hashes = dict(result.receipt.manifest_sha256s)
     manifest_files = {}
     for role in ("tune", "cal", "test"):
@@ -880,6 +936,7 @@ def load_split_receipt(
             raise ValueError(f"manifest_sha256 receipt mismatch for role {role!r}")
         manifests[role] = manifest
     assert_pairwise_disjoint(manifests)
+    _validate_split_role_assignments(manifests, receipt)
     manifest_representatives = {
         (item.doc_id, item.content_sha256, item.cluster_id)
         for manifest in manifests.values()

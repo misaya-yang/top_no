@@ -99,6 +99,21 @@ class SplitConstructionTests(unittest.TestCase):
         self.assertEqual(len(merged.clusters), 1)
         self.assertEqual(len(separated.clusters), 2)
 
+    def test_exact_threshold_pair_cannot_be_missed_by_lsh(self):
+        base = " ".join(f"x1078_{index}" for index in range(16))
+        other = base + " x1078_16"
+
+        result = build_split_artifacts(
+            [SourceDocument("a", base), SourceDocument("b", other)],
+            source="fixture-corpus",
+            source_snapshot_sha256="1" * 64,
+            cluster_namespace_sha256="0" * 64,
+            global_salt="salt-1",
+        )
+
+        self.assertEqual(len(result.clusters), 1)
+        self.assertEqual(sum(len(value.documents) for value in result.manifests.values()), 1)
+
     def test_near_duplicate_edges_form_transitive_components(self):
         base = words("chain", 50)
         middle = base + " " + words("middle-extra", 5)
@@ -177,9 +192,16 @@ class SplitConstructionTests(unittest.TestCase):
                 ]
             )
 
-    def test_documents_shorter_than_one_full_shingle_fail_closed(self):
-        with self.assertRaisesRegex(ValueError, "at least shingle_size"):
-            self.build([SourceDocument("short", "one two three")])
+    def test_short_documents_use_a_receipt_bound_whole_document_shingle(self):
+        result = self.build(
+            [
+                SourceDocument("short-a", "one two three"),
+                SourceDocument("short-b", "one two three"),
+            ]
+        )
+
+        self.assertEqual(len(result.clusters), 1)
+        self.assertIn("short-doc-fallback", result.receipt.normalization_policy)
 
 
 if __name__ == "__main__":

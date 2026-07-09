@@ -4,7 +4,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from dataclasses import replace
+from dataclasses import asdict, replace
 from pathlib import Path
 
 
@@ -12,11 +12,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "experiments"))
 
 from splits import (  # noqa: E402
+    DocumentManifest,
     SourceDocument,
     SplitBuildArtifacts,
     build_split_artifacts,
     load_split_receipt,
     manifest_sha256,
+    save_manifest,
     save_split_artifacts,
     split_receipt_sha256,
 )
@@ -97,6 +99,63 @@ class SplitArtifactTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaisesRegex(ValueError, "source mismatch"):
                 save_split_artifacts(mismatched, Path(tmp))
+
+    def test_receipt_manifest_hash_order_is_canonical(self):
+        result = self.build()
+        reordered = replace(
+            result.receipt,
+            manifest_sha256s=tuple(reversed(result.receipt.manifest_sha256s)),
+        )
+
+        with self.assertRaisesRegex(ValueError, "canonical role order"):
+            split_receipt_sha256(reordered)
+
+    def moved_to_wrong_role(self, result):
+        source_role = next(
+            role for role, manifest in result.manifests.items() if manifest.documents
+        )
+        target_role = next(role for role in ("tune", "cal", "test") if role != source_role)
+        moved = result.manifests[source_role].documents[0]
+        manifests = dict(result.manifests)
+        manifests[source_role] = replace(
+            manifests[source_role],
+            documents=manifests[source_role].documents[1:],
+        )
+        manifests[target_role] = replace(
+            manifests[target_role],
+            documents=manifests[target_role].documents + (moved,),
+        )
+        receipt = replace(
+            result.receipt,
+            manifest_sha256s=tuple(
+                (role, manifest_sha256(manifests[role]))
+                for role in ("tune", "cal", "test")
+            ),
+        )
+        return SplitBuildArtifacts(result.clusters, manifests, receipt)
+
+    def test_save_recomputes_cluster_role_from_salt(self):
+        tampered = self.moved_to_wrong_role(self.build())
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaisesRegex(ValueError, "split role mismatch"):
+                save_split_artifacts(tampered, Path(tmp))
+
+    def test_load_recomputes_cluster_role_from_salt(self):
+        result = self.build()
+        tampered = self.moved_to_wrong_role(result)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            receipt_path = save_split_artifacts(result, root)
+            for role, manifest in tampered.manifests.items():
+                save_manifest(manifest, root / f"{role}_manifest.json")
+            wrapper = json.loads(receipt_path.read_text())
+            wrapper["receipt"] = asdict(tampered.receipt)
+            wrapper["receipt_sha256"] = split_receipt_sha256(tampered.receipt)
+            receipt_path.write_text(json.dumps(wrapper))
+
+            with self.assertRaisesRegex(ValueError, "split role mismatch"):
+                load_split_receipt(receipt_path)
 
     def test_manifest_symlink_cannot_escape_artifact_directory(self):
         result = self.build()
