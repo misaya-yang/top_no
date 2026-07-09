@@ -19,6 +19,7 @@ results/*.pt
 # IDE
 .vscode/
 .idea/
+.worktrees/
 
 # Jupyter
 .ipynb_checkpoints/
