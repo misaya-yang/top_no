@@ -34,8 +34,8 @@ RTX 5090 server, project virtualenv:
 ```text
 python -m compileall experiments                          PASS
 for script in scripts/*.sh; do bash -n "$script"; done   PASS
-python -m unittest discover tests                         139/139 PASS at 027d28d;
-                                                         repaired rerun pending
+python -m unittest discover tests                         144 run, 143 PASS,
+                                                         1 MPS-only skip
 ```
 
 ## RTX 5090 vocabulary-scale smoke
