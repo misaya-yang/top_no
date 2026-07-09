@@ -1,5 +1,17 @@
-# 实验验证报告
-## Truncation Sampling as Hypothesis Testing under an Identified Noise Channel
+# Retired Legacy Experiment Report
+## Previous title: Truncation Sampling as Hypothesis Testing under an Identified Noise Channel
+
+> **Current status**
+>
+> This document is retained only as a historical record of the pre-audit
+> experiment series. It is not the current paper claim stack and should not be
+> read as evidence that an LLM noise channel has been identified.
+>
+> Active claim stack: `docs/paper/CLAIM_STACK.md`.
+> Active experiment plan: `docs/paper/EXPERIMENT_MAINLINE.md`.
+> Current framing: token truncation as prediction-set construction, with
+> frequency-offset margin rules evaluated by calibrated coverage/size and
+> frequency-bucket behavior.
 
 **日期**: 2026-07-04  
 **硬件**: NVIDIA RTX 5090 (32GB), Python 3.12, PyTorch 2.8, Transformers 4.57  

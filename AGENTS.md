@@ -2,10 +2,12 @@
 
 ## Project Context
 
-This repository supports an ICML 2027 paper draft, "Truncation Sampling as
-Hypothesis Testing". Treat experiment code, figure names, JSON result names, and
-CLI argument shapes as part of the paper workflow unless a task explicitly asks
-to change them.
+This repository supports an ICML 2027 paper draft currently framed as
+"Frequency-Offset Margin Rules for Calibrated Language Model Decoding".
+The older "Truncation Sampling as Hypothesis Testing" / identified-noise-channel
+framing is legacy and must not be presented as the current claim stack. Treat
+experiment code, figure names, JSON result names, and CLI argument shapes as
+part of the paper workflow unless a task explicitly asks to change them.
 
 ## Repository Layout
 

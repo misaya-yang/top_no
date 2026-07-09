@@ -1,13 +1,40 @@
 # top_no
 
 Research repository for the ICML 2027 draft:
-**Truncation Sampling as Hypothesis Testing**.
+**Frequency-Offset Margin Rules for Calibrated Language Model Decoding**.
+
+Retired framing: earlier drafts used the title **Truncation Sampling as
+Hypothesis Testing** and argued for an identified frequency-dependent noise
+channel. That framing is now legacy. The active project treats token truncation
+as prediction-set construction and asks a falsifiable question: does token
+frequency carry information beyond the logit margin?
+
+## Current Thesis
+
+Token truncation in language-model decoding constructs a candidate prediction
+set. Standard truncation rules can be read as margin rules over
+`m_i = s_max - s_i`; the current method family studies frequency-offset scores:
+
+```text
+A(x, i) = m_i(x) - g(n_i)
+S(x) = { i : A(x, i) <= q_hat }
+```
+
+where `q_hat` is a split-conformal quantile and `g` may be zero, a signed
+inverse-frequency offset, a frequency-bucket/Mondrian offset, or a learned
+offset. Conformal calibration supplies coverage for any score, so the paper
+claim must come from improved coverage/size tradeoffs or better
+frequency-bucket behavior at matched coverage.
 
 ## Current Status
 
-This repository has been patched for the first reproducibility audit:
+This repository has been patched for the first reproducibility audit and the
+first calibrated prediction-set pipeline:
 
 - Decoding experiments now share `experiments/samplers.py`.
+- `min_p`, `fixed_margin`, and `conformal_nu` are available in the shared
+  sampler surface.
+- `experiments/conformal.py` contains the split-conformal scoring helpers.
 - `top_p` uses the standard nucleus rule and keeps the crossing token.
 - Batch generation uses left padding, EOS-aware stopping, and generated-token-only
   metrics.
@@ -16,8 +43,9 @@ This repository has been patched for the first reproducibility audit:
 - Invalid truncated distributions now fail instead of silently falling back to
   untruncated softmax.
 
-Existing files in `results/` were produced before these fixes. Treat them as
-legacy artifacts until the relevant experiments are rerun.
+Existing files in `results/` and the old final reports were produced before
+these fixes. Treat them as legacy artifacts until the relevant experiments are
+rerun under the calibrated protocol.
 
 ## Layout
 
@@ -26,6 +54,8 @@ legacy artifacts until the relevant experiments are rerun.
 - `tests/`: lightweight sampler correctness tests.
 - `scripts/`: suite-level shell entrypoints.
 - `results/`: generated figures and JSON result artifacts.
+- `docs/paper/`: active claim stack, experiment mainline, and positioning notes.
+- `docs/fable5/`: external research critiques and planning documents.
 - `docs/reports/`: experiment writeups and summary reports.
 - `requirements.txt`: Python runtime dependencies.
 - `AGENTS.md`: working instructions for repository agents and contributors.

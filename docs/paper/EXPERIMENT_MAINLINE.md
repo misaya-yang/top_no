@@ -1,5 +1,19 @@
 # Experiment Mainline
 
+## Stage 0: Margin x Frequency Diagnostic
+
+Before spending GPU on downstream decoding claims, estimate:
+
+```text
+h(m, n) = P(Y = i | margin m_i = m, frequency n_i = n)
+```
+
+using held-out next-token positions. The diagnostic should answer whether token
+frequency changes true-token probability at fixed logit margin and should also
+determine the empirical sign of any frequency offset. If this surface is flat in
+`n` after conditioning on `m`, the project becomes a calibrated audit /
+negative-result paper rather than a new decoding-method paper.
+
 ## Stage 1: Prediction-Set Gate
 
 Run:
@@ -13,8 +27,13 @@ python experiments/check_prediction_set_gate.py --metrics results/prediction_set
 Required signal before spending more GPU:
 
 ```text
-At fixed target coverage, conformal-nu should reduce average support size against at least one strong baseline, or at matched support size it should improve low-frequency coverage without degrading overall coverage.
+At fixed target coverage, a frequency-offset rule should improve the coverage/size frontier against calibrated margin-only baselines, or reduce frequency-bucket coverage gaps at matched marginal coverage and mean set size.
 ```
+
+Coverage attainment alone is not evidence because split conformal gives
+coverage for any score. The gate should compare calibrated methods against
+calibrated methods; uncalibrated top-p/min-p/fixed-margin numbers are diagnostic
+context only.
 
 ## Stage 2: Reasoning Self-Consistency
 
@@ -65,7 +84,7 @@ PYTHON_BIN=python bash scripts/run_controlled_channels_qwen3b.sh
 
 Report:
 
-- hidden-noise target-logit sensitivity by target-token frequency.
+- target-token sensitivity by target-token frequency.
 - dropout-ensemble target-logit variance by target-token frequency.
 
 Quantization residuals are a planned extension and require an explicit dependency decision.

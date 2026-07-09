@@ -19,7 +19,9 @@ Rather than proposing another heuristic truncation threshold, we evaluate trunca
 
 ## Baseline Priority
 
-The first table should compare:
+The first table should compare calibrated methods against calibrated methods.
+Uncalibrated truncation rules are useful diagnostics, but not enough for the
+paper claim:
 
 - `top_k_50`
 - `top_p_0.95`
@@ -27,6 +29,9 @@ The first table should compare:
 - `fixed_margin_3`
 - `top_nsigma_2`
 - `nu_k10_m3`
+- calibrated margin / `kappa=0`
+- conformal top-p / APS-style cumulative-mass baseline
+- frequency-Mondrian margin baseline
 - `conformal_nu`
 
-Do not lead with Distinct-n. It is a downstream surface-diversity metric, not the core claim.
+Do not lead with Distinct-n. It is a downstream surface-diversity metric, not the core claim. Do not present conformal coverage alone as evidence for frequency-aware decoding; coverage is generic once a valid split-conformal score is chosen.

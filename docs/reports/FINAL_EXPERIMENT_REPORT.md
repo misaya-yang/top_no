@@ -1,5 +1,18 @@
-# 最终实验验证报告（CCF-A 投稿版）
-## Truncation Sampling as Hypothesis Testing under an Identified Noise Channel
+# Retired Legacy Experiment Report
+## Previous title: Truncation Sampling as Hypothesis Testing under an Identified Noise Channel
+
+> **Current status**
+>
+> This document is retained only as a historical record of the pre-audit
+> experiments. It is not the current paper claim stack and should not be cited
+> as evidence that the real LLM noise channel has been identified or that
+> nu-sampling beats top-p/top-nsigma as a paper-ready result.
+>
+> Active claim stack: `docs/paper/CLAIM_STACK.md`.
+> Active experiment plan: `docs/paper/EXPERIMENT_MAINLINE.md`.
+> Current framing: token truncation as prediction-set construction, with
+> frequency-offset margin rules evaluated by calibrated coverage/size and
+> frequency-bucket behavior.
 
 > **2026-07-08 reproducibility audit note**
 >
