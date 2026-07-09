@@ -49,8 +49,8 @@ do not edit generated `results/`; never label development output paper-grade.
 
 ### Task 5: Documentation, review, and integration
 
-- [ ] Update roadmap/mainline docs with the exact achieved boundary.
-- [ ] Run `compileall`, shell syntax checks, full unit suite, and a reduced
-      document-store smoke.
-- [ ] Request independent review; fix all Critical/Important findings.
+- [x] Update roadmap/mainline docs with the exact achieved boundary.
+- [x] Run `compileall`, shell syntax checks, full unit suite, and a reduced
+      synthetic split benchmark.
+- [x] Request independent review; fix all Critical/Important findings.
 - [ ] Commit, push feature branch, merge to `main`, rerun checks, and push.
