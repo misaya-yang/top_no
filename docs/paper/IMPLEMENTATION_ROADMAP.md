@@ -72,8 +72,9 @@ Status: exact text binding and the lower-level `[G]` forward are complete.
 
 Status: complete in code; paper execution remains fail-closed.
 
-- The audit compares every frequency-manifest document against the union of the
-  canonical tune/cal/test representatives.
+- The audit compares every frequency-manifest document against every document
+  in the frozen evaluation input JSONL, including non-representative members of
+  retained clusters.
 - Candidate generation unions deterministic MinHash-LSH with the
   threshold-complete prefix index; exact integer `5I >= 4U` confirmation fixes
   the paper threshold at Jaccard `>= 0.8` over normalized 13-token shingles.

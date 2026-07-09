@@ -67,6 +67,11 @@ class DocumentStoreTests(unittest.TestCase):
 
         rows = [item for _, documents in bound.documents_by_role for item in documents]
         expected_text = {item.doc_id: item.text for item in self.documents}
+        self.assertEqual(
+            {item.doc_id: item.text for item in bound.source_documents},
+            expected_text,
+        )
+        self.assertEqual(bound.split_receipt, self.result.receipt)
         self.assertEqual(len(rows), self.result.receipt.num_clusters)
         for row in rows:
             self.assertEqual(row.text, expected_text[row.doc_id])

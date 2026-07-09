@@ -3,7 +3,7 @@
 - [x] Add threshold-complete cross-corpus candidate generation and exact
   Jaccard confirmation at the frozen 13-shingle, 0.8 protocol.
 - [x] Bind the frequency manifest to exact source JSONL and reuse PR-1c binding
-  for evaluation representatives.
+  for every evaluation input document, including discarded cluster members.
 - [x] Serialize a content-addressed audit with transcript and match hashes.
 - [x] Recompute saved audits and reject forged zero-match receipts.
 - [x] Add a CLI that refuses to write a passing artifact on overlap.

@@ -6,11 +6,13 @@ import tempfile
 import unittest
 from dataclasses import replace
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "experiments"))
 
+import document_store  # noqa: E402
 from cross_corpus import (  # noqa: E402
     CrossCorpusAudit,
     audit_cross_corpus,
@@ -129,6 +131,16 @@ class CrossCorpusTests(unittest.TestCase):
 
         self.assertEqual(self.audit(), expected)
 
+    def test_audit_loads_the_split_snapshot_once(self):
+        with patch.object(
+            document_store,
+            "load_split_receipt",
+            wraps=document_store.load_split_receipt,
+        ) as mocked_load:
+            self.audit()
+
+        mocked_load.assert_called_once()
+
     def test_exact_cross_corpus_duplicate_is_recorded_as_failure(self):
         duplicated = list(self.frequency_documents)
         duplicated[0] = SourceDocument("freq-overlap", self.evaluation_documents[0].text)
@@ -202,7 +214,7 @@ class CrossCorpusTests(unittest.TestCase):
         self.assertEqual(audit.matches[0].intersection_size, 1)
         self.assertEqual(audit.matches[0].union_size, 1)
 
-    def test_scope_excludes_discarded_members_of_evaluation_clusters(self):
+    def test_scope_includes_discarded_members_of_evaluation_clusters(self):
         base_tokens = [f"chain-{index}" for index in range(32)]
         left_text = " ".join(base_tokens)
         middle_core = " ".join(base_tokens + [f"chain-{index}" for index in range(32, 36)])
@@ -247,9 +259,16 @@ class CrossCorpusTests(unittest.TestCase):
 
         audit = self.audit()
 
-        self.assertEqual(audit.receipt.comparison_scope,
-                         "frequency-manifest-docs-vs-eval-role-representatives-v1")
-        self.assertEqual(audit.receipt.verdict, "pass")
+        self.assertEqual(
+            audit.receipt.comparison_scope,
+            "frequency-manifest-docs-vs-evaluation-input-documents-v1",
+        )
+        self.assertEqual(audit.receipt.verdict, "fail")
+        self.assertGreaterEqual(audit.receipt.match_count, 1)
+        self.assertIn(
+            discarded_endpoint.doc_id,
+            {match.evaluation_doc_id for match in audit.matches},
+        )
 
     def test_frequency_jsonl_must_exactly_match_frequency_manifest(self):
         changed = list(self.frequency_documents)

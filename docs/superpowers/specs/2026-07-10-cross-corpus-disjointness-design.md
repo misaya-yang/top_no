@@ -12,9 +12,9 @@ source text.
 
 - Left side: every document in the `freq` manifest, with exact raw text bound
   from its source JSONL by `doc_id` and SHA-256.
-- Right side: the union of canonical representatives in the tune/cal/test
-  manifests referenced by the PR-1b split receipt, bound to its exact input
-  JSONL by the PR-1c document store.
+- Right side: every document in the exact evaluation input JSONL bound by the
+  PR-1b split receipt and PR-1c document store, including discarded members of
+  retained clusters.
 - Normalization: NFKC, case-fold, whitespace tokenization.
 - Similarity: set Jaccard over 13-token shingles, with the paper threshold
   represented exactly as `4/5`.
@@ -22,11 +22,13 @@ source text.
   threshold-complete prefix index, followed by exact integer comparison.
 - Passing condition: zero pairs satisfy `5 * intersection >= 4 * union`.
 
-The right side deliberately contains one representative per within-evaluation
-cluster. The PR-1b receipt proves all discarded evaluation documents are in the
-same connected components as those representatives. The cross audit does not
-rewrite either corpus or silently drop collisions; any collision is a hard
-failure that requires rebuilding the upstream artifacts.
+Scanning all input members is necessary because PR-1b clusters are transitive
+connected components: a discarded endpoint can be below the threshold against
+the chosen representative while still being linked through an intermediate
+member. Restricting the audit to representatives would therefore permit a
+frequency document to duplicate an evaluation-cluster member. The cross audit
+does not rewrite either corpus or silently drop collisions; any collision is a
+hard failure that requires rebuilding the upstream artifacts.
 
 ## Receipt and validation
 
@@ -38,9 +40,11 @@ match list. The CLI writes an artifact only when the match list is empty.
 `validate_cross_corpus_audit` first validates the wrapper and serialized
 matches, then recomputes the entire audit from the configured inputs and
 requires structural equality. This rejects a forged zero-match receipt even if
-its internal hashes are self-consistent. The prediction-set protocol performs
-this recomputation before model allocation and then stops at
-`blocked_pending_pr2_pr3`.
+its internal hashes are self-consistent. PR-1c's bound document snapshot carries
+the exact split receipt and full source-document tuple from one load, so scan
+parameters, manifest bindings, and compared text cannot come from separate
+receipt reads. The prediction-set protocol performs this recomputation before
+model allocation and then stops at `blocked_pending_pr2_pr3`.
 
 ## Non-goals
 

@@ -7,7 +7,7 @@ import json
 import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Mapping, Sequence
+from typing import Iterator, Mapping, Sequence
 
 from document_store import bind_split_documents
 from splits import (
@@ -16,10 +16,8 @@ from splits import (
     SPLIT_CONSTRUCTION_VERSION,
     SourceDocument,
     content_sha256,
-    exact_prefix_candidates,
     load_manifest,
     load_source_documents_jsonl,
-    load_split_receipt,
     manifest_sha256,
     minhash_signature,
     shingle_hashes,
@@ -29,7 +27,7 @@ from splits import (
 
 
 CROSS_CORPUS_VERSION = "icml2027-pr1d-v1"
-COMPARISON_SCOPE = "frequency-manifest-docs-vs-eval-role-representatives-v1"
+COMPARISON_SCOPE = "frequency-manifest-docs-vs-evaluation-input-documents-v1"
 REQUIRED_SHINGLE_SIZE = 13
 THRESHOLD_NUMERATOR = 4
 THRESHOLD_DENOMINATOR = 5
@@ -53,7 +51,7 @@ class CrossCorpusReceipt:
     frequency_document_count: int
     evaluation_split_receipt_sha256: str
     evaluation_documents_sha256: str
-    evaluation_representative_count: int
+    evaluation_document_count: int
     evaluation_tune_manifest_sha256: str
     evaluation_cal_manifest_sha256: str
     evaluation_test_manifest_sha256: str
@@ -132,7 +130,7 @@ def _bind_frequency_documents(
     return manifest, documents
 
 
-def _cross_candidates(
+def _cross_candidate_rows(
     frequency_sets: Sequence[frozenset[int]],
     evaluation_sets: Sequence[frozenset[int]],
     *,
@@ -140,18 +138,21 @@ def _cross_candidates(
     minhash_seed: int,
     num_perm: int,
     lsh_bands: int,
-) -> set[tuple[int, int]]:
-    combined = tuple(frequency_sets) + tuple(evaluation_sets)
-    frequency_count = len(frequency_sets)
-    candidates = {
-        (left, right - frequency_count)
-        for left, right in exact_prefix_candidates(combined, threshold)
-        if left < frequency_count <= right
-    }
-
+) -> Iterator[tuple[int, tuple[int, ...]]]:
+    if threshold != THRESHOLD_NUMERATOR / THRESHOLD_DENOMINATOR:
+        raise ValueError("cross-corpus candidate threshold must equal 4/5")
     rows = num_perm // lsh_bands
-    frequency_buckets: dict[tuple[int, tuple[int, ...]], list[int]] = {}
-    for index, shingles in enumerate(frequency_sets):
+    evaluation_prefix_buckets: dict[int, list[int]] = {}
+    evaluation_lsh_buckets: dict[tuple[int, tuple[int, ...]], list[int]] = {}
+    for index, shingles in enumerate(evaluation_sets):
+        ceil_threshold_size = (
+            THRESHOLD_NUMERATOR * len(shingles)
+            + THRESHOLD_DENOMINATOR
+            - 1
+        ) // THRESHOLD_DENOMINATOR
+        prefix_length = len(shingles) - ceil_threshold_size + 1
+        for value in sorted(shingles)[:prefix_length]:
+            evaluation_prefix_buckets.setdefault(value, []).append(index)
         signature = minhash_signature(
             shingles,
             minhash_seed=minhash_seed,
@@ -159,8 +160,12 @@ def _cross_candidates(
         )
         for band in range(lsh_bands):
             key = (band, signature[band * rows : (band + 1) * rows])
-            frequency_buckets.setdefault(key, []).append(index)
-    for evaluation_index, shingles in enumerate(evaluation_sets):
+            evaluation_lsh_buckets.setdefault(key, []).append(index)
+
+    for frequency_index, shingles in enumerate(frequency_sets):
+        candidates: set[int] = set()
+        for value in shingles:
+            candidates.update(evaluation_prefix_buckets.get(value, ()))
         signature = minhash_signature(
             shingles,
             minhash_seed=minhash_seed,
@@ -168,11 +173,8 @@ def _cross_candidates(
         )
         for band in range(lsh_bands):
             key = (band, signature[band * rows : (band + 1) * rows])
-            candidates.update(
-                (frequency_index, evaluation_index)
-                for frequency_index in frequency_buckets.get(key, ())
-            )
-    return candidates
+            candidates.update(evaluation_lsh_buckets.get(key, ()))
+        yield frequency_index, tuple(sorted(candidates))
 
 
 def _find_matches(
@@ -193,55 +195,57 @@ def _find_matches(
         shingle_hashes(document.text, shingle_size)
         for document in evaluation_documents
     )
-    candidates = _cross_candidates(
+    matches = []
+    transcript = []
+    candidate_pair_count = 0
+    for frequency_index, evaluation_indices in _cross_candidate_rows(
         frequency_sets,
         evaluation_sets,
         threshold=threshold,
         minhash_seed=minhash_seed,
         num_perm=num_perm,
         lsh_bands=lsh_bands,
-    )
-    matches = []
-    transcript = []
-    for frequency_index, evaluation_index in sorted(candidates):
-        left = frequency_sets[frequency_index]
-        right = evaluation_sets[evaluation_index]
-        if (
-            THRESHOLD_DENOMINATOR * min(len(left), len(right))
-            < THRESHOLD_NUMERATOR * max(len(left), len(right))
-        ):
-            continue
-        intersection_size = len(left & right)
-        union_size = len(left | right)
-        transcript.append(
-            {
-                "frequency_doc_id": frequency_documents[frequency_index].doc_id,
-                "evaluation_doc_id": evaluation_documents[evaluation_index].doc_id,
-                "frequency_content_sha256": content_sha256(
-                    frequency_documents[frequency_index].text
-                ),
-                "evaluation_content_sha256": content_sha256(
-                    evaluation_documents[evaluation_index].text
-                ),
-                "intersection_size": intersection_size,
-                "union_size": union_size,
-            }
-        )
-        if (
-            THRESHOLD_DENOMINATOR * intersection_size
-            < THRESHOLD_NUMERATOR * union_size
-        ):
-            continue
-        matches.append(
-            CrossCorpusMatch(
-                frequency_doc_id=frequency_documents[frequency_index].doc_id,
-                evaluation_doc_id=evaluation_documents[evaluation_index].doc_id,
-                intersection_size=intersection_size,
-                union_size=union_size,
+    ):
+        candidate_pair_count += len(evaluation_indices)
+        for evaluation_index in evaluation_indices:
+            left = frequency_sets[frequency_index]
+            right = evaluation_sets[evaluation_index]
+            if (
+                THRESHOLD_DENOMINATOR * min(len(left), len(right))
+                < THRESHOLD_NUMERATOR * max(len(left), len(right))
+            ):
+                continue
+            intersection_size = len(left & right)
+            union_size = len(left | right)
+            transcript.append(
+                {
+                    "frequency_doc_id": frequency_documents[frequency_index].doc_id,
+                    "evaluation_doc_id": evaluation_documents[evaluation_index].doc_id,
+                    "frequency_content_sha256": content_sha256(
+                        frequency_documents[frequency_index].text
+                    ),
+                    "evaluation_content_sha256": content_sha256(
+                        evaluation_documents[evaluation_index].text
+                    ),
+                    "intersection_size": intersection_size,
+                    "union_size": union_size,
+                }
             )
-        )
+            if (
+                THRESHOLD_DENOMINATOR * intersection_size
+                < THRESHOLD_NUMERATOR * union_size
+            ):
+                continue
+            matches.append(
+                CrossCorpusMatch(
+                    frequency_doc_id=frequency_documents[frequency_index].doc_id,
+                    evaluation_doc_id=evaluation_documents[evaluation_index].doc_id,
+                    intersection_size=intersection_size,
+                    union_size=union_size,
+                )
+            )
     transcript_hash = hashlib.sha256(_canonical_json(transcript)).hexdigest()
-    return tuple(matches), transcript_hash, len(candidates), len(transcript)
+    return tuple(matches), transcript_hash, candidate_pair_count, len(transcript)
 
 
 def audit_cross_corpus(
@@ -257,7 +261,6 @@ def audit_cross_corpus(
         frequency_manifest_path,
         frequency_document_jsonl,
     )
-    evaluation_receipt, _ = load_split_receipt(evaluation_split_receipt_path)
     bound_evaluation = bind_split_documents(
         evaluation_split_receipt_path,
         evaluation_document_jsonl,
@@ -265,11 +268,8 @@ def audit_cross_corpus(
     )
     if not bound_evaluation.for_role("cal") or not bound_evaluation.for_role("test"):
         raise ValueError("calibration and test manifests must both be non-empty")
-    evaluation_documents = tuple(
-        SourceDocument(document.doc_id, document.text)
-        for _, documents in bound_evaluation.documents_by_role
-        for document in documents
-    )
+    evaluation_receipt = bound_evaluation.split_receipt
+    evaluation_documents = bound_evaluation.source_documents
     if evaluation_receipt.shingle_size != REQUIRED_SHINGLE_SIZE:
         raise ValueError(
             f"paper protocol requires shingle_size={REQUIRED_SHINGLE_SIZE}"
@@ -305,7 +305,7 @@ def audit_cross_corpus(
         frequency_document_count=len(frequency_documents),
         evaluation_split_receipt_sha256=split_receipt_sha256(evaluation_receipt),
         evaluation_documents_sha256=evaluation_receipt.input_documents_sha256,
-        evaluation_representative_count=len(evaluation_documents),
+        evaluation_document_count=len(evaluation_documents),
         evaluation_tune_manifest_sha256=eval_manifest_hashes["tune"],
         evaluation_cal_manifest_sha256=eval_manifest_hashes["cal"],
         evaluation_test_manifest_sha256=eval_manifest_hashes["test"],
@@ -353,7 +353,7 @@ def _validate_receipt(receipt: CrossCorpusReceipt) -> None:
         raise ValueError("split construction schema mismatch")
     for field_name in (
         "frequency_document_count",
-        "evaluation_representative_count",
+        "evaluation_document_count",
         "shingle_size",
         "threshold_numerator",
         "threshold_denominator",
@@ -372,7 +372,7 @@ def _validate_receipt(receipt: CrossCorpusReceipt) -> None:
         raise ValueError("invalid MinHash-LSH layout")
     if (
         receipt.frequency_document_count <= 0
-        or receipt.evaluation_representative_count <= 0
+        or receipt.evaluation_document_count <= 0
         or receipt.candidate_pair_count < 0
         or receipt.exact_comparison_count < 0
         or receipt.match_count < 0

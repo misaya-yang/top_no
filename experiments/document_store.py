@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Mapping
 
 from splits import (
+    SourceDocument,
+    SplitBuildReceipt,
     content_sha256,
     load_manifest,
     load_source_documents_jsonl,
@@ -28,11 +30,13 @@ class BoundDocument:
 
 @dataclass(frozen=True)
 class BoundSplitDocuments:
+    split_receipt: SplitBuildReceipt
     receipt_sha256: str
     input_documents_sha256: str
     source: str
     source_snapshot_sha256: str
     cluster_namespace_sha256: str
+    source_documents: tuple[SourceDocument, ...]
     documents_by_role: tuple[tuple[str, tuple[BoundDocument, ...]], ...]
 
     def for_role(self, role: str) -> tuple[BoundDocument, ...]:
@@ -102,10 +106,12 @@ def bind_split_documents(
         bound_roles.append((role, tuple(bound_documents)))
 
     return BoundSplitDocuments(
+        split_receipt=receipt,
         receipt_sha256=split_receipt_sha256(receipt),
         input_documents_sha256=actual_input_hash,
         source=receipt.source,
         source_snapshot_sha256=receipt.source_snapshot_sha256,
         cluster_namespace_sha256=receipt.cluster_namespace_sha256,
+        source_documents=documents,
         documents_by_role=tuple(bound_roles),
     )
