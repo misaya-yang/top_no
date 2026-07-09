@@ -14,9 +14,16 @@ determine the empirical sign of any frequency offset. If this surface is flat in
 `n` after conditioning on `m`, the project becomes a calibrated audit /
 negative-result paper rather than a new decoding-method paper.
 
+Phase 0 must also test whether `h_m(m)` is monotone, quantify held-out
+predictive gain from adding frequency, and distinguish a general
+two-dimensional learned-`h` surface from an additive horizontal shift
+`m-g(n)`. A null frequency interaction is not enough to call C-margin
+frontier-optimal without the monotonicity and power checks.
+
 ## Stage 1: Prediction-Set Gate
 
-Run:
+Target entrypoints after PR-1 through PR-3 are complete (they are intentionally
+blocked today):
 
 ```bash
 PYTHON_BIN=python bash scripts/run_prediction_sets_qwen3b.sh
@@ -74,22 +81,10 @@ Report:
 - evaluator LM perplexity.
 - length-normalized unique token ratio.
 
-## Stage 4: Controlled Channels
-
-Run:
-
-```bash
-PYTHON_BIN=python bash scripts/run_controlled_channels_qwen3b.sh
-```
-
-Report:
-
-- target-token sensitivity by target-token frequency.
-- dropout-ensemble target-logit variance by target-token frequency.
-
-Quantization residuals are a planned extension and require an explicit dependency decision.
-
 ## One-Shot GPU Queue
+
+This is also a target post-PR-3 entrypoint. Controlled-channel experiments are
+archived and intentionally absent from the active paper queue.
 
 Run:
 

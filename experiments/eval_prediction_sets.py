@@ -26,6 +26,12 @@ from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from conformal import conformal_quantile, nu_nonconformity
+from freq_table import (
+    FrequencyTableMetadata,
+    load_frequency_table,
+    special_token_ids,
+)
+from protocol import effective_config_sha256, validate_protocol_inputs
 from samplers import get_keep_mask
 
 
@@ -147,6 +153,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--device", type=str, default=None,
                    choices=["auto", "cpu", "cuda", "mps"])
     p.add_argument("--output-dir", type=str, default=None)
+    p.add_argument("--frequency-table", type=str, default=None)
+    p.add_argument("--frequency-manifest", type=str, default=None)
+    p.add_argument("--tune-manifest", type=str, default=None)
+    p.add_argument("--calibration-manifest", type=str, default=None)
+    p.add_argument("--test-manifest", type=str, default=None)
     p.add_argument("--trust-remote-code", action="store_true")
     p.add_argument(
         "--allow-legacy-protocol",
@@ -181,6 +192,11 @@ def load_config(path: str | None) -> dict[str, Any]:
         "output_dir": "./results/smoke_prediction_sets",
         "trust_remote_code": True,
         "allow_legacy_protocol": False,
+        "frequency_table": None,
+        "frequency_manifest": None,
+        "tune_manifest": None,
+        "calibration_manifest": None,
+        "test_manifest": None,
     }
     if path:
         with open(path) as f:
@@ -202,17 +218,9 @@ def merge_args(config: dict[str, Any], args: argparse.Namespace) -> dict[str, An
     return config
 
 
-def assert_protocol_is_allowed(config: dict[str, Any]) -> None:
-    if config.get("allow_legacy_protocol"):
-        return
-    raise RuntimeError(
-        "eval_prediction_sets.py is currently the legacy pre-PR1 protocol and "
-        "is blocked for paper-grade runs. Known defects: token counts are built "
-        "from the loaded calibration/eval text pool, and calibration/eval "
-        "positions are consumed sequentially rather than via disjoint hashed "
-        "document splits. Set allow_legacy_protocol=true only for smoke/link "
-        "tests, not for citable experiments."
-    )
+def assert_protocol_is_allowed(config: dict[str, Any]) -> dict[str, Any]:
+    """Validate protocol inputs before allocating a dataset or model."""
+    return validate_protocol_inputs(config)
 
 
 def resolve_device(name: str) -> torch.device:
@@ -323,6 +331,35 @@ def build_token_counts(tokenizer, texts: list[str], vocab_size: int, max_length:
         valid_ids = ids[mask]
         counts += torch.bincount(valid_ids, minlength=vocab_size).float()
     return counts
+
+
+def resolve_token_counts(
+    tokenizer,
+    model,
+    config: dict[str, Any],
+    texts: list[str],
+) -> tuple[torch.Tensor, FrequencyTableMetadata | None]:
+    """Load frozen counts, or use the explicit legacy smoke fallback."""
+    if config.get("frequency_table"):
+        return load_frequency_table(
+            Path(config["frequency_table"]),
+            expected_model_id=config["model"],
+            expected_tokenizer_id=config.get("tokenizer_id") or config["model"],
+            expected_vocab_size=model.config.vocab_size,
+            expected_exclusion_token_ids=special_token_ids(tokenizer),
+        )
+    if not config.get("allow_legacy_protocol"):
+        raise RuntimeError(
+            "frequency_table is required outside explicit legacy smoke runs"
+        )
+    counts = build_token_counts(
+        tokenizer,
+        texts,
+        vocab_size=model.config.vocab_size,
+        max_length=int(config["max_length"]),
+        batch_size=int(config["batch_size"]),
+    )
+    return counts, None
 
 
 def default_methods(config: dict[str, Any], q_hat: float) -> list[dict[str, Any]]:
@@ -474,7 +511,7 @@ def plot_pareto(summary: dict[str, Any], output_dir: Path) -> None:
 def main() -> None:
     args = parse_args()
     config = merge_args(load_config(args.config), args)
-    assert_protocol_is_allowed(config)
+    protocol = assert_protocol_is_allowed(config)
     torch.manual_seed(int(config["seed"]))
     np.random.seed(int(config["seed"]))
 
@@ -490,13 +527,7 @@ def main() -> None:
     texts = load_texts(config)
     print(f"[prediction-sets] loaded_texts={len(texts)}")
     model, tokenizer = load_model_and_tokenizer(config, device)
-    token_counts = build_token_counts(
-        tokenizer,
-        texts,
-        vocab_size=model.config.vocab_size,
-        max_length=int(config["max_length"]),
-        batch_size=int(config["batch_size"]),
-    )
+    token_counts, _ = resolve_token_counts(tokenizer, model, config, texts)
     print(f"[prediction-sets] vocab={model.config.vocab_size} nonzero_counts={(token_counts > 0).sum().item()}")
 
     cal_scores, n_cal = collect_calibration_scores(model, tokenizer, texts, token_counts, config, device)
@@ -518,6 +549,8 @@ def main() -> None:
         "alpha": float(config["alpha"]),
         "delta": float(config["delta"]),
         "elapsed_sec": time.time() - t0,
+        "config_sha256": effective_config_sha256(config),
+        "protocol": protocol,
         "methods": {
             method["name"]: stats[method["name"]].summary(method["kwargs"])
             for method in methods

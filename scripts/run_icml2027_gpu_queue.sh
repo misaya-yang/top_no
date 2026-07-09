@@ -17,29 +17,25 @@ echo "ICML 2027 GPU queue started: $(date)"
 echo "Python: $("$PYTHON_BIN" --version)"
 echo "============================================================"
 
-echo "[1/6] Prediction-set evaluation"
+echo "[1/5] Prediction-set evaluation"
 "$PYTHON_BIN" experiments/eval_prediction_sets.py \
   --config configs/prediction_sets_qwen3b.json
 
-echo "[2/6] Prediction-set figures"
+echo "[2/5] Prediction-set figures"
 "$PYTHON_BIN" experiments/plot_prediction_sets.py \
   --metrics "$PRED_METRICS"
 
-echo "[3/6] Decision gate"
+echo "[3/5] Decision gate"
 "$PYTHON_BIN" experiments/check_prediction_set_gate.py \
   --metrics "$PRED_METRICS"
 
-echo "[4/6] Reasoning self-consistency"
+echo "[4/5] Reasoning self-consistency"
 "$PYTHON_BIN" experiments/eval_reasoning_self_consistency.py \
   --config configs/reasoning_self_consistency_qwen3b.json
 
-echo "[5/6] Open-ended quality"
+echo "[5/5] Open-ended quality"
 "$PYTHON_BIN" experiments/eval_openended_quality.py \
   --config configs/openended_quality_qwen3b.json
-
-echo "[6/6] Controlled channels"
-"$PYTHON_BIN" experiments/exp5b_controlled_channels.py \
-  --config configs/controlled_channels_qwen3b.json
 
 echo "============================================================"
 echo "ICML 2027 GPU queue complete: $(date)"

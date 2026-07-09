@@ -42,7 +42,7 @@ artifact or refuses to run.
 - Consumes: JSON manifest paths from evaluator configuration and the frequency
   artifact's `source_manifest_sha256`.
 
-- [ ] **Step 1: Write manifest hashing and intersection tests**
+- [x] **Step 1: Write manifest hashing and intersection tests**
 
 Create `tests/test_protocol_manifests.py` with tests that construct manifests in
 temporary directories, verify deterministic hashes under reordered documents,
@@ -133,7 +133,7 @@ if __name__ == "__main__":
     unittest.main()
 ```
 
-- [ ] **Step 2: Run the focused tests and confirm the missing-module failure**
+- [x] **Step 2: Run the focused tests and confirm the missing-module failure**
 
 Run:
 
@@ -143,7 +143,7 @@ python3 -m unittest tests.test_protocol_manifests -v
 
 Expected: `ERROR` with `ModuleNotFoundError: No module named 'splits'`.
 
-- [ ] **Step 3: Implement the manifest contract**
+- [x] **Step 3: Implement the manifest contract**
 
 Create `experiments/splits.py`. Canonical JSON uses sorted documents and
 `sort_keys=True, separators=(",", ":")`. Reject blank identifiers, duplicate
@@ -151,7 +151,7 @@ identifiers within one manifest, wrapper hash mismatch, and pairwise
 intersections. `save_manifest()` writes a wrapper containing
 `manifest_sha256` and `manifest`.
 
-- [ ] **Step 4: Run the focused tests**
+- [x] **Step 4: Run the focused tests**
 
 Run:
 
@@ -176,7 +176,7 @@ Expected: 6 tests pass.
   `make_frequency_table_metadata()`, `save_frequency_table()`,
   and `load_frequency_table()`.
 
-- [ ] **Step 1: Write artifact round-trip and tamper tests**
+- [x] **Step 1: Write artifact round-trip and tamper tests**
 
 Create tests using `torch.tensor([4, 0, 7], dtype=torch.int64)` and a one-document
 frequency manifest. Verify deterministic sidecar filenames, exact round-trip,
@@ -184,7 +184,7 @@ and fatal failures for modified tensor data, modified metadata, model mismatch,
 tokenizer mismatch, vocabulary mismatch, and exclusion mismatch. Skip the file
 only when Torch is unavailable, matching the repository's current test style.
 
-- [ ] **Step 2: Run tests and confirm the missing-module failure**
+- [x] **Step 2: Run tests and confirm the missing-module failure**
 
 Run:
 
@@ -194,7 +194,7 @@ python3 -m unittest tests.test_freq_table -v
 
 Expected: `ERROR` with `ModuleNotFoundError: No module named 'freq_table'`.
 
-- [ ] **Step 3: Implement canonical hashing and safe I/O**
+- [x] **Step 3: Implement canonical hashing and safe I/O**
 
 Implementation requirements:
 
@@ -246,7 +246,7 @@ Validate the wrapper artifact ID, sidecar filename, relative counts filename,
 tensor shape/dtype/integrality/non-negativity/hash, expected identity fields,
 and that every exclusion ID is in range and has count zero.
 
-- [ ] **Step 4: Run artifact tests**
+- [x] **Step 4: Run artifact tests**
 
 Run:
 
@@ -261,6 +261,7 @@ Expected: all artifact tests pass.
 ### Task 3: Evaluator protocol validation and provenance
 
 **Files:**
+- Create: `experiments/protocol.py`
 - Modify: `experiments/eval_prediction_sets.py`
 - Create: `tests/test_prediction_protocol.py`
 
@@ -269,8 +270,11 @@ Expected: all artifact tests pass.
   `calibration_manifest`, and `test_manifest` config paths.
 - Produces: `validate_protocol_inputs(config) -> dict[str, Any]`,
   `effective_config_sha256(config) -> str`, and result JSON `protocol` metadata.
+  The first two functions live in the lightweight `protocol.py` boundary so
+  their fail-closed behavior is testable without importing model/dataset/plot
+  dependencies.
 
-- [ ] **Step 1: Write protocol-state tests**
+- [x] **Step 1: Write protocol-state tests**
 
 Tests must assert:
 
@@ -289,7 +293,7 @@ assert it was not called, proving the failure happens before model allocation.
 An intersecting manifest and a source-hash mismatch must fail with their
 specific invariant names.
 
-- [ ] **Step 2: Run the focused tests and observe failure**
+- [x] **Step 2: Run the focused tests and observe failure**
 
 Run:
 
@@ -300,7 +304,7 @@ python3 -m unittest tests.test_prediction_protocol -v
 Expected: import or assertion failures because protocol validation is not yet
 implemented.
 
-- [ ] **Step 3: Add config fields and fail-closed validation**
+- [x] **Step 3: Add config fields and fail-closed validation**
 
 Extend defaults and CLI with optional paths. Keep
 `--allow-legacy-protocol`. `validate_protocol_inputs()` behaves as follows:
@@ -319,7 +323,7 @@ supplied for a legacy smoke, load it after tokenizer/model creation through
 `load_frequency_table()`; otherwise call the preserved legacy
 `build_token_counts()` path. Record the exact artifact reference when used.
 
-- [ ] **Step 4: Run the protocol and existing smoke-helper tests**
+- [x] **Step 4: Run the protocol and existing smoke-helper tests**
 
 Run:
 
@@ -344,13 +348,13 @@ their existing explicit skip.
   `protocol.frequency_table.metadata_path`, `artifact_id`, and `counts_sha256`.
 - Produces: the exact validated count tensor used for upstream calibration.
 
-- [ ] **Step 1: Add downstream mismatch tests**
+- [x] **Step 1: Add downstream mismatch tests**
 
 Add fixtures for an upstream metrics JSON. Assert that missing artifact
 reference, missing file, and hash mismatch each raise before `load_texts()` can
 be called. Assert a matching artifact returns exactly the saved counts.
 
-- [ ] **Step 2: Run the test and observe the current silent rebuild**
+- [x] **Step 2: Run the test and observe the current silent rebuild**
 
 Run:
 
@@ -361,7 +365,7 @@ python3 -m unittest tests.test_prediction_protocol -v
 Expected: new tests fail because both downstream scripts still call
 `build_token_counts()` over new WikiText text.
 
-- [ ] **Step 3: Replace implicit rebuilding with the shared artifact loader**
+- [x] **Step 3: Replace implicit rebuilding with the shared artifact loader**
 
 Change both `build_counts_for_strategies()` functions:
 
@@ -390,7 +394,7 @@ the sidecar through `load_frequency_table()`, and compare the recorded artifact
 ID and counts hash. Remove unused `load_texts`/`build_token_counts` imports from
 these two scripts only.
 
-- [ ] **Step 4: Re-run downstream protocol tests**
+- [x] **Step 4: Re-run downstream protocol tests**
 
 Run:
 
@@ -414,7 +418,7 @@ Expected: all applicable tests pass.
 - Produces: a five-stage gated queue with controlled channels removed and a
   claim stack that distinguishes general learned-`h` from additive offsets.
 
-- [ ] **Step 1: Add a shell regression assertion**
+- [x] **Step 1: Add a shell regression assertion**
 
 Run before editing:
 
@@ -425,7 +429,7 @@ rg -n "Controlled channels|exp5b_controlled_channels" \
 
 Expected: matches demonstrate stale mainline entries.
 
-- [ ] **Step 2: Make the smallest narrative corrections**
+- [x] **Step 2: Make the smallest narrative corrections**
 
 - Remove controlled channels from the active one-shot queue and renumber it
   `[1/5]` through `[5/5]`.
@@ -442,7 +446,7 @@ Expected: matches demonstrate stale mainline entries.
   margin-class optimal; Phase 0 must also check monotonicity of `h_m(m)` and
   report a power bound.
 
-- [ ] **Step 3: Verify stale queue references are gone**
+- [x] **Step 3: Verify stale queue references are gone**
 
 Run:
 

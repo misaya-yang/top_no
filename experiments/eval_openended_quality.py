@@ -15,8 +15,9 @@ import numpy as np
 import torch
 from datasets import load_dataset
 
-from eval_prediction_sets import build_token_counts, load_model_and_tokenizer, load_texts, resolve_device
+from eval_prediction_sets import load_model_and_tokenizer, resolve_device
 from eval_reasoning_self_consistency import conformal_kwargs_from_metrics
+from freq_table import load_frequency_table_from_metrics, special_token_ids
 from samplers import batch_generate
 
 
@@ -136,23 +137,20 @@ def load_openended_prompts(name: str, n: int, seed: int) -> list[str]:
 
 
 def build_counts_for_strategies(model, tokenizer, config: dict[str, Any]) -> torch.Tensor:
-    count_config = {
-        "dataset": config["count_dataset"],
-        "split": config["count_split"],
-        "n_texts": config["count_n_texts"],
-        "max_length": config["count_max_length"],
-        "batch_size": config["batch_size"],
-        "seed": config["seed"],
-        "text_file": config.get("count_text_file"),
-    }
-    texts = load_texts(count_config)
-    return build_token_counts(
-        tokenizer,
-        texts,
-        vocab_size=model.config.vocab_size,
-        max_length=int(config["count_max_length"]),
-        batch_size=int(config["batch_size"]),
+    metrics_path = config.get("prediction_set_metrics")
+    if not metrics_path:
+        raise RuntimeError(
+            "prediction_set_metrics with a frequency-table artifact is required; "
+            "downstream runs may not rebuild counts"
+        )
+    counts, _ = load_frequency_table_from_metrics(
+        Path(metrics_path),
+        expected_model_id=config["model"],
+        expected_tokenizer_id=config.get("tokenizer_id") or config["model"],
+        expected_vocab_size=model.config.vocab_size,
+        expected_exclusion_token_ids=special_token_ids(tokenizer),
     )
+    return counts
 
 
 def method_specs(config: dict[str, Any], token_counts: torch.Tensor) -> dict[str, dict[str, Any]]:
