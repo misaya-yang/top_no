@@ -11,6 +11,7 @@ from splits import (  # noqa: E402
     ManifestDocument,
     pooled_positions,
     select_guarantee_position,
+    select_guarantee_positions,
 )
 
 
@@ -92,6 +93,46 @@ class DocumentSamplingTests(unittest.TestCase):
                 tuple(range(16)) + ("bad",),
                 salt="salt",
             )
+
+    def test_batch_selector_emits_exactly_one_per_document_independent_of_order(self):
+        documents = [
+            ManifestDocument("doc-a", "0" * 64, "cluster-a"),
+            ManifestDocument("doc-b", "1" * 64, "cluster-b"),
+        ]
+        token_ids = {"doc-a": tuple(range(17)), "doc-b": tuple(range(24))}
+
+        forward = select_guarantee_positions(documents, token_ids, salt="cal-salt")
+        reversed_order = select_guarantee_positions(
+            list(reversed(documents)), token_ids, salt="cal-salt"
+        )
+
+        self.assertEqual(forward, reversed_order)
+        self.assertEqual(len(forward), len(documents))
+        self.assertEqual({item.doc_id for item in forward}, {"doc-a", "doc-b"})
+        self.assertEqual(forward[0].target_index, 16)
+
+    def test_batch_selector_requires_exact_document_token_mapping(self):
+        document = ManifestDocument("doc", "0" * 64, "cluster")
+
+        with self.assertRaisesRegex(ValueError, "token mapping.*missing"):
+            select_guarantee_positions([document], {}, salt="salt")
+        with self.assertRaisesRegex(ValueError, "token mapping.*extra"):
+            select_guarantee_positions(
+                [document],
+                {"doc": tuple(range(17)), "extra": tuple(range(17))},
+                salt="salt",
+            )
+
+    def test_calibration_and_test_salts_are_separate_deterministic_draws(self):
+        document = ManifestDocument("doc", "0" * 64, "cluster")
+        token_ids = tuple(range(128))
+
+        calibration = select_guarantee_position(
+            document, token_ids, salt="calibration-salt"
+        )
+        test = select_guarantee_position(document, token_ids, salt="test-salt")
+
+        self.assertNotEqual(calibration.target_index, test.target_index)
 
 
 if __name__ == "__main__":

@@ -961,6 +961,44 @@ def select_guarantee_position(
     )
 
 
+def select_guarantee_positions(
+    documents: Sequence[ManifestDocument],
+    token_ids_by_doc: Mapping[str, Sequence[int]],
+    *,
+    salt: str,
+    excluded_target_ids: Collection[int] = (),
+    min_context: int = 16,
+) -> tuple[SelectedPosition, ...]:
+    """Select one [G] target for every document with exact input binding."""
+    if not isinstance(token_ids_by_doc, Mapping):
+        raise ValueError("token_ids_by_doc must be a mapping")
+    by_id = {}
+    for document in documents:
+        if not isinstance(document, ManifestDocument):
+            raise ValueError("documents must contain ManifestDocument values")
+        if document.doc_id in by_id:
+            raise ValueError(f"duplicate doc_id: {document.doc_id!r}")
+        by_id[document.doc_id] = document
+    document_ids = set(by_id)
+    token_ids = set(token_ids_by_doc)
+    missing = sorted(document_ids - token_ids)
+    extra = sorted(token_ids - document_ids)
+    if missing:
+        raise ValueError(f"token mapping has missing document IDs: {missing!r}")
+    if extra:
+        raise ValueError(f"token mapping has extra document IDs: {extra!r}")
+    return tuple(
+        select_guarantee_position(
+            by_id[doc_id],
+            token_ids_by_doc[doc_id],
+            salt=salt,
+            excluded_target_ids=excluded_target_ids,
+            min_context=min_context,
+        )
+        for doc_id in sorted(by_id)
+    )
+
+
 def pooled_positions(
     document: ManifestDocument,
     token_ids: Sequence[int],
