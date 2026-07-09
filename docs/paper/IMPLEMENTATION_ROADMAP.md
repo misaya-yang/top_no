@@ -13,7 +13,8 @@ binds those artifacts to exact text and a prefix-only `[G]` forward helper.
 PR-1d adds a recomputed, threshold-complete cross-corpus disjointness proof.
 The normal `experiments/eval_prediction_sets.py` path remains blocked because:
 
-1. the calibrated methods registry and suffstats replay are not implemented;
+1. four mandatory registry methods, tuning artifacts, evaluator emission, and
+   suffstats replay are still missing;
 2. the current gate compares one calibrated method against mostly uncalibrated
    baselines.
 
@@ -110,8 +111,8 @@ corpus/table is still required before any paper-grade runner can execute.
 Status: PR-2a conformal-core implementation is complete. The first PR-2b
 registry slice supplies stable identities plus tensor-only execution for
 C-margin, C-logprob, C-zmargin, APS, signed C-nu, frequency-Mondrian margin, and
-entropy-Mondrian margin. Remaining mandatory methods, runner integration, tuning artifacts,
-per-document evidence, and suffstats remain blocked.
+entropy-Mondrian margin. Remaining mandatory methods, runner integration,
+tuning artifacts, per-document evidence emission, and suffstats remain blocked.
 
 PR-2c now defines a strict, content-addressed per-position gate-evidence
 contract. It binds canonical method calibration, frozen PR-1/config artifacts,
@@ -128,8 +129,8 @@ unseen-token choices are now pre-registered in
 bind exact `D_tune` rows plus the pinned frequency artifact; diagnostic bands
 must not be substituted into Mondrian calibration or CovGap.
 
-- Add `mondrian_quantiles`, score dithering, and a tuning path that reads
-  `D_tune` only.
+- `mondrian_quantiles` and score dithering are complete; add a tuning path that
+  reads `D_tune` only.
 - Complete `experiments/methods.py` for calibrated baselines: C-margin, C-logprob,
   C-zmargin, APS, RAPS, TS+APS, CNS, entropy-Mondrian, frequency-Mondrian,
   learned-h/g, and C-nu.
