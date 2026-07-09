@@ -49,3 +49,20 @@ Remaining high-priority work:
   nu variants before test-set reporting.
 - Add quality metrics beyond Distinct-n for open-ended generation.
 - Strengthen channel evidence beyond synthetic-channel estimator recovery.
+
+## 2026-07-09 Repo Reconciliation Addendum
+
+Fable5's pushed-`main` reconciliation upgraded two earlier risks to confirmed
+protocol defects:
+
+- `experiments/eval_prediction_sets.py` builds token-frequency counts from the
+  same loaded text pool later used for calibration/evaluation. This leaks
+  evaluation text into the frequency side information and invalidates any
+  conformal-validity claim from that runner.
+- The runner consumes calibration positions first and evaluation positions next
+  from the same shuffled stream. This is a sequential split rather than a
+  document-level exchangeable split.
+
+Until these are fixed, committed prediction-set outputs are link tests only.
+The runner now refuses paper-grade execution unless `allow_legacy_protocol=true`
+is explicitly set for smoke tests.

@@ -148,6 +148,16 @@ def parse_args() -> argparse.Namespace:
                    choices=["auto", "cpu", "cuda", "mps"])
     p.add_argument("--output-dir", type=str, default=None)
     p.add_argument("--trust-remote-code", action="store_true")
+    p.add_argument(
+        "--allow-legacy-protocol",
+        action="store_true",
+        help=(
+            "Run the pre-PR1 protocol for smoke/link tests only. The current "
+            "protocol builds frequency counts from the loaded text pool and "
+            "uses a sequential calibration/eval split, so its outputs are not "
+            "paper evidence."
+        ),
+    )
     return p.parse_args()
 
 
@@ -170,6 +180,7 @@ def load_config(path: str | None) -> dict[str, Any]:
         "device": "auto",
         "output_dir": "./results/smoke_prediction_sets",
         "trust_remote_code": True,
+        "allow_legacy_protocol": False,
     }
     if path:
         with open(path) as f:
@@ -186,7 +197,22 @@ def merge_args(config: dict[str, Any], args: argparse.Namespace) -> dict[str, An
             config[key] = value
     if args.trust_remote_code:
         config["trust_remote_code"] = True
+    if args.allow_legacy_protocol:
+        config["allow_legacy_protocol"] = True
     return config
+
+
+def assert_protocol_is_allowed(config: dict[str, Any]) -> None:
+    if config.get("allow_legacy_protocol"):
+        return
+    raise RuntimeError(
+        "eval_prediction_sets.py is currently the legacy pre-PR1 protocol and "
+        "is blocked for paper-grade runs. Known defects: token counts are built "
+        "from the loaded calibration/eval text pool, and calibration/eval "
+        "positions are consumed sequentially rather than via disjoint hashed "
+        "document splits. Set allow_legacy_protocol=true only for smoke/link "
+        "tests, not for citable experiments."
+    )
 
 
 def resolve_device(name: str) -> torch.device:
@@ -448,6 +474,7 @@ def plot_pareto(summary: dict[str, Any], output_dir: Path) -> None:
 def main() -> None:
     args = parse_args()
     config = merge_args(load_config(args.config), args)
+    assert_protocol_is_allowed(config)
     torch.manual_seed(int(config["seed"]))
     np.random.seed(int(config["seed"]))
 

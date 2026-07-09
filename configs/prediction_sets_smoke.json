@@ -14,5 +14,6 @@
   "dtype": "auto",
   "device": "auto",
   "output_dir": "./results/smoke_prediction_sets",
-  "trust_remote_code": true
+  "trust_remote_code": true,
+  "allow_legacy_protocol": true
 }

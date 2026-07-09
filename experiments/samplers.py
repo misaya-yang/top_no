@@ -13,10 +13,21 @@ import torch
 import torch.nn.functional as F
 
 
+LEGACY_NU_STRATEGIES = {"nu_topp_floor", "nu_entropy", "nu_mathboost"}
+
+
 def _require_token_freq(token_freq_table: torch.Tensor | None, strategy: str) -> torch.Tensor:
     if token_freq_table is None:
         raise ValueError(f"{strategy} requires token_freq_table")
     return token_freq_table
+
+
+def _require_legacy_strategy_enabled(strategy: str, kwargs: dict[str, Any]) -> None:
+    if not kwargs.get("legacy", False):
+        raise ValueError(
+            f"{strategy} is a deprecated legacy strategy. Pass legacy=True only "
+            "when reproducing archived experiments; do not use it in paper pipelines."
+        )
 
 
 def _top_p_keep_mask(logits: torch.Tensor, p: float) -> torch.Tensor:
@@ -56,7 +67,12 @@ def get_keep_mask(
     token_freq_table: torch.Tensor | None = None,
     **kwargs: Any,
 ) -> torch.Tensor:
-    """Return the boolean candidate-set mask for batched raw logits."""
+    """Return the boolean candidate-set mask for batched raw logits.
+
+    `nu_topp_floor`, `nu_entropy`, and `nu_mathboost` are archived repair
+    variants from the retired hypothesis-testing framing. They require
+    `legacy=True` and should not appear in current paper pipelines.
+    """
     if strategy == "greedy":
         keep = torch.zeros_like(logits, dtype=torch.bool)
         keep.scatter_(-1, logits.argmax(dim=-1, keepdim=True), True)
@@ -108,6 +124,7 @@ def get_keep_mask(
         keep = nonconformity <= float(kwargs["q_hat"])
 
     elif strategy == "nu_topp_floor":
+        _require_legacy_strategy_enabled(strategy, kwargs)
         freqs = _require_token_freq(token_freq_table, strategy)
         s_max = logits.max(dim=-1, keepdim=True).values
         margin = _nu_margin(logits, freqs, kwargs.get("kappa", 10.0), kwargs.get("m0", 3.0))
@@ -116,6 +133,7 @@ def get_keep_mask(
         keep = nu_keep | topp_keep
 
     elif strategy == "nu_entropy":
+        _require_legacy_strategy_enabled(strategy, kwargs)
         freqs = _require_token_freq(token_freq_table, strategy)
         kappa = kwargs.get("kappa", 10.0)
         m0 = kwargs.get("m0", 3.0)
@@ -133,6 +151,7 @@ def get_keep_mask(
         keep = (s_max - logits) <= margin
 
     elif strategy == "nu_mathboost":
+        _require_legacy_strategy_enabled(strategy, kwargs)
         freqs = _require_token_freq(token_freq_table, strategy)
         math_freq = kwargs.get("math_freq_table")
         if math_freq is None:

@@ -25,6 +25,11 @@ the ICML 2027 decoding/calibration project.
    - Fable5's stress-test specification for hardening the theory, gate,
      baselines, and implementation plan before spending larger GPU budget.
 
+5. `2026-07-09-repo-reconciliation-addendum-v1.1.md`
+   - Fable5's reconciliation after inspecting the pushed GitHub `main`.
+   - Upgrades two risks to confirmed defects: eval-pool frequency-count leakage
+     and sequential calibration/eval splitting.
+
 ## Current Takeaway
 
 The project should not currently claim a universal new sampler. The stronger
@@ -35,6 +40,8 @@ does not, the fallback is a conformal audit / measurement paper.
 ## Immediate Implementation Focus
 
 - Implement the Phase 0 margin x frequency diagnostic.
+- First repair P0 protocol defects: external/disjoint frequency counts,
+  document-level split manifests, and a calibrated-vs-calibrated gate.
 - Add calibrated baselines: C-margin, conformal top-p / APS, RAPS, CNS, signed
   C-nu, frequency-Mondrian margin, and learned-g.
 - Replace the current gate with calibrated-vs-calibrated Pareto and CovGap

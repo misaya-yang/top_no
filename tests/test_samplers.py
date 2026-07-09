@@ -96,6 +96,43 @@ class SamplerTests(unittest.TestCase):
 
         self.assertEqual(torch.isfinite(truncated).tolist(), [[True, True, False]])
 
+    def test_legacy_nu_variants_require_explicit_flag(self):
+        logits = torch.tensor([[5.0, 2.0, 1.0]], dtype=torch.float32)
+        freqs = torch.tensor([100.0, 1.0, 1.0], dtype=torch.float32)
+
+        with self.assertRaisesRegex(ValueError, "deprecated legacy strategy"):
+            apply_truncation(logits, "nu_entropy", token_freq_table=freqs)
+
+        truncated = apply_truncation(
+            logits,
+            "nu_entropy",
+            token_freq_table=freqs,
+            legacy=True,
+        )
+        self.assertTrue(torch.isfinite(truncated[0, 0]))
+
+    def test_legacy_mathboost_requires_explicit_flag(self):
+        logits = torch.tensor([[5.0, 2.0, 1.0]], dtype=torch.float32)
+        freqs = torch.tensor([100.0, 1.0, 1.0], dtype=torch.float32)
+        math_freqs = torch.tensor([100.0, 50.0, 50.0], dtype=torch.float32)
+
+        with self.assertRaisesRegex(ValueError, "deprecated legacy strategy"):
+            apply_truncation(
+                logits,
+                "nu_mathboost",
+                token_freq_table=freqs,
+                math_freq_table=math_freqs,
+            )
+
+        truncated = apply_truncation(
+            logits,
+            "nu_mathboost",
+            token_freq_table=freqs,
+            math_freq_table=math_freqs,
+            legacy=True,
+        )
+        self.assertTrue(torch.isfinite(truncated[0, 0]))
+
     def test_batch_generate_left_padding_position_ids_and_eos_slicing(self):
         class Encoding(dict):
             def to(self, device):

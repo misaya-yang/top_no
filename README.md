@@ -47,6 +47,11 @@ Existing files in `results/` and the old final reports were produced before
 these fixes. Treat them as legacy artifacts until the relevant experiments are
 rerun under the calibrated protocol.
 
+Protocol blocker: the current prediction-set runner is intentionally blocked
+for paper-grade runs until the PR-1..PR-3 protocol repairs land. The legacy
+runner builds token counts from the loaded calibration/eval text pool and uses a
+sequential calibration/eval split, so its outputs are smoke-test artifacts only.
+
 ## Layout
 
 - `experiments/`: runnable experiment scripts and shared experiment utilities.
@@ -93,13 +98,14 @@ PYTHONPATH="$PWD/experiments" python3 experiments/exp1_topk_bias.py --output-dir
 ```
 
 Run the local prediction-set smoke test with the verified conda Torch
-environment:
+environment. This is a legacy-protocol link test, not paper evidence:
 
 ```bash
 bash scripts/run_prediction_sets_smoke.sh
 ```
 
-Run the rented-GPU Qwen2.5-3B prediction-set experiment:
+The rented-GPU Qwen2.5-3B prediction-set experiment is blocked by default until
+the split/count/gate repairs land:
 
 ```bash
 PYTHON_BIN=python bash scripts/run_prediction_sets_qwen3b.sh

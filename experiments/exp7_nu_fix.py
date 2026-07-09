@@ -11,6 +11,10 @@ Three fix strategies:
          better-estimated tokens with a smaller uncertainty radius
 
 Evaluates on both GSM8K (reasoning) and creative (diversity) tasks.
+
+Retired status: this script belongs to the archived hypothesis-testing /
+nu-repair experiment series. Use `--legacy` only for historical reproduction;
+do not use its strategies in current paper pipelines.
 """
 import argparse, json, os, time, re
 from collections import Counter
@@ -34,6 +38,11 @@ def parse_args():
     p.add_argument("--temperature", type=float, default=1.0)
     p.add_argument("--output-dir", type=str, default="./results")
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument(
+        "--legacy",
+        action="store_true",
+        help="Required to run archived nu_topp_floor/nu_entropy/nu_mathboost strategies.",
+    )
     return p.parse_args()
 
 
@@ -247,6 +256,12 @@ CREATIVE_PROMPTS = [
 
 def main():
     args = parse_args()
+    if not args.legacy:
+        raise SystemExit(
+            "exp7_nu_fix.py is a retired legacy experiment. Re-run with "
+            "--legacy only for historical reproduction; do not use it for "
+            "current paper evidence."
+        )
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
     os.makedirs(args.output_dir, exist_ok=True)
@@ -294,16 +309,17 @@ def main():
         "nu_topp_floor": {
             "strategy": "nu_topp_floor",
             "kwargs": {"token_freq_table": token_counts, "kappa": 10.0, "m0": 3.0,
-                       "p": 0.95},
+                       "p": 0.95, "legacy": True},
         },
         "nu_entropy": {
             "strategy": "nu_entropy",
-            "kwargs": {"token_freq_table": token_counts, "kappa": 10.0, "m0": 3.0},
+            "kwargs": {"token_freq_table": token_counts, "kappa": 10.0, "m0": 3.0,
+                       "legacy": True},
         },
         "nu_mathboost": {
             "strategy": "nu_mathboost",
             "kwargs": {"token_freq_table": token_counts, "kappa": 10.0, "m0": 3.0,
-                       "math_freq_table": math_freq},
+                       "math_freq_table": math_freq, "legacy": True},
         },
     }
 

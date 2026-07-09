@@ -50,8 +50,10 @@ PYTHONPATH="$PWD/experiments" python3 experiments/<experiment>.py --output-dir .
 
 Most full experiments are GPU/model-cache dependent. The suite scripts default
 to offline Hugging Face mode for the current GPU server workflow.
-The V2 GPU queue runs the prediction-set experiment first and stops before
-downstream generation if `experiments/check_prediction_set_gate.py` fails.
+The V2 GPU queue is currently blocked before paper-grade prediction-set runs:
+`experiments/eval_prediction_sets.py` uses a legacy pre-PR1 protocol unless
+`allow_legacy_protocol=true` is explicitly set for smoke/link tests. Do not use
+legacy-protocol outputs as paper evidence.
 
 ## Local Environment
 
@@ -67,6 +69,16 @@ downstream generation if `experiments/check_prediction_set_gate.py` fails.
 
 The full model experiments still require the expected model cache and enough
 GPU/MPS memory; do not infer paper numbers from smoke tests.
+
+## Current Blockers
+
+- Do not rent GPU for citable prediction-set runs until the frequency-table,
+  document split, and calibrated-vs-calibrated gate repairs are implemented.
+- The legacy prediction-set runner builds frequency counts from the loaded text
+  pool and consumes calibration/eval positions sequentially.
+- `nu_topp_floor`, `nu_entropy`, and `nu_mathboost` are archived legacy repair
+  strategies; they require `legacy=True` and must not appear in current paper
+  pipelines.
 
 ## Verification
 
