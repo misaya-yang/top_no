@@ -51,6 +51,7 @@ class MethodRegistryTests(unittest.TestCase):
             {
                 "c_margin",
                 "c_logprob",
+                "c_zmargin",
                 "aps",
                 "c_nu",
                 "entropy_mondrian_margin",
@@ -126,6 +127,27 @@ class MethodRegistryTests(unittest.TestCase):
         self.assertTrue(
             torch.equal(keep, probabilities >= math.exp(-fitted.q_hat))
         )
+
+    def test_c_zmargin_calibrates_through_canonical_registry(self):
+        torch.manual_seed(37)
+        calibration_logits = torch.randn(19, 13, dtype=torch.float64)
+        targets = torch.arange(19) % 13
+        fitted = calibrate_method(
+            "c_zmargin",
+            calibration_logits,
+            targets,
+            delta=0.1,
+            uniforms=torch.zeros_like(calibration_logits),
+        )
+        test_logits = torch.randn(3, 13, dtype=torch.float64)
+        keep = prediction_set_mask(
+            fitted,
+            test_logits,
+            uniforms=torch.zeros_like(test_logits),
+        )
+
+        self.assertEqual(keep.shape, test_logits.shape)
+        self.assertTrue(keep.any(dim=-1).all())
 
     def test_c_nu_at_zero_matches_c_margin_end_to_end(self):
         torch.manual_seed(17)

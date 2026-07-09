@@ -27,6 +27,8 @@ from conformal import (
     margin_scores,
     mondrian_quantiles,
     nu_nonconformity,
+    zmargin_nonconformity,
+    zmargin_scores,
 )
 
 
@@ -68,7 +70,7 @@ _REGISTRY = (
         "context",
         "baseline",
         "score_dither",
-        False,
+        True,
     ),
     MethodDefinition(
         "aps", "cumulative_mass", "none", "baseline", "aps_boundary", True
@@ -259,6 +261,8 @@ def _target_scores(
         )
     elif method_key == "c_logprob":
         scores = logprob_nonconformity(logits, target_ids)
+    elif method_key == "c_zmargin":
+        scores = zmargin_nonconformity(logits, target_ids)
     else:
         scores = margin_nonconformity(logits, target_ids)
     rows = torch.arange(target_ids.shape[0], device=target_ids.device)
@@ -362,6 +366,8 @@ def _candidate_scores(
         )
     elif calibration.method_key == "c_logprob":
         scores = logprob_scores(logits)
+    elif calibration.method_key == "c_zmargin":
+        scores = zmargin_scores(logits)
     else:
         scores = margin_scores(logits)
     if calibration.dither_epsilon is None:

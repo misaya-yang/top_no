@@ -24,6 +24,8 @@ try:
         logprob_scores,
         mondrian_quantiles,
         nu_nonconformity,
+        zmargin_nonconformity,
+        zmargin_scores,
     )
     from samplers import get_keep_mask  # noqa: E402
 except ModuleNotFoundError:
@@ -271,6 +273,58 @@ class ConformalCoreTests(unittest.TestCase):
                 )
                 self.assertTrue(torch.allclose(full, expected, atol=1e-6))
                 self.assertTrue(torch.allclose(target, expected[:, 0], atol=1e-6))
+
+    def test_c_zmargin_is_shift_stable_and_handles_zero_variance(self):
+        logits = torch.tensor([[0.0, 8.0], [3.0, 3.0]], dtype=torch.float32)
+        shifted = torch.tensor([[1e8, 1e8 + 8.0], [1e8, 1e8]], dtype=torch.float32)
+
+        scores = zmargin_scores(logits)
+        shifted_scores = zmargin_scores(shifted)
+
+        self.assertTrue(torch.allclose(scores, shifted_scores, atol=1e-6))
+        self.assertEqual(scores[1].tolist(), [0.0, 0.0])
+        targets = torch.tensor([0, 1])
+        with patch.object(
+            conformal,
+            "_zmargin_working_logits",
+            side_effect=AssertionError("full fp32 working logits were materialized"),
+        ):
+            target_scores = zmargin_nonconformity(shifted, targets)
+        self.assertTrue(
+            torch.allclose(
+                target_scores,
+                shifted_scores.gather(-1, targets.unsqueeze(-1)).squeeze(-1),
+            )
+        )
+
+    def test_c_zmargin_is_calibrated_top_nsigma(self):
+        torch.manual_seed(31)
+        logits = torch.randn(8, 31, dtype=torch.float64)
+        q_hat = 1.7
+
+        conformal_keep = zmargin_scores(logits) <= q_hat
+        nsigma_keep = get_keep_mask(logits, "top_nsigma", n_sigma=q_hat)
+
+        self.assertTrue(torch.equal(conformal_keep, nsigma_keep))
+
+    def test_c_zmargin_target_matches_full_across_chunk_boundary(self):
+        torch.manual_seed(41)
+        for dtype in (torch.float16, torch.float32, torch.float64):
+            with self.subTest(dtype=dtype):
+                logits = torch.randn(2, 4097, dtype=dtype)
+                targets = torch.tensor([0, 4096])
+                full = zmargin_scores(logits).gather(
+                    -1, targets.unsqueeze(-1)
+                ).squeeze(-1)
+                target = zmargin_nonconformity(logits, targets)
+                self.assertTrue(torch.equal(target, full))
+
+        singleton = torch.tensor([[7.0]])
+        self.assertEqual(zmargin_scores(singleton).tolist(), [[0.0]])
+        self.assertEqual(
+            zmargin_nonconformity(singleton, torch.tensor([0])).tolist(),
+            [0.0],
+        )
 
     def test_c_margin_is_calibrated_min_p(self):
         torch.manual_seed(11)

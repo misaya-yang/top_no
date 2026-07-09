@@ -118,6 +118,64 @@ def logprob_nonconformity(
     return torch.log(exp_sum) - centered_targets
 
 
+def _zmargin_working_logits(logits: torch.Tensor) -> torch.Tensor:
+    return logits if logits.dtype == torch.float64 else logits.float()
+
+
+def _zero_safe_zmargin(margins: torch.Tensor, sigma: torch.Tensor) -> torch.Tensor:
+    positive = sigma > 0
+    safe_sigma = torch.where(positive, sigma, torch.ones_like(sigma))
+    scores = margins / safe_sigma
+    return torch.where(positive, scores, torch.zeros_like(scores))
+
+
+def _zmargin_row_statistics(logits: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    """Return row max/sample std with one shared bounded-memory reduction."""
+    accumulation_dtype = torch.float64 if logits.dtype == torch.float64 else torch.float32
+    row_max = logits.max(dim=-1).values.to(accumulation_dtype)
+    if logits.shape[1] == 1:
+        return row_max, torch.zeros_like(row_max)
+    chunk_size = 4096
+    centered_sum = torch.zeros_like(row_max)
+    for start in range(0, logits.shape[1], chunk_size):
+        chunk = logits[:, start : start + chunk_size].to(accumulation_dtype)
+        centered_sum += (chunk - row_max.unsqueeze(-1)).sum(dim=-1)
+    centered_mean = centered_sum / logits.shape[1]
+    squared_sum = torch.zeros_like(row_max)
+    for start in range(0, logits.shape[1], chunk_size):
+        chunk = logits[:, start : start + chunk_size].to(accumulation_dtype)
+        centered = chunk - row_max.unsqueeze(-1) - centered_mean.unsqueeze(-1)
+        squared_sum += (centered * centered).sum(dim=-1)
+    sigma = torch.sqrt(squared_sum / (logits.shape[1] - 1))
+    return row_max, sigma
+
+
+def zmargin_scores(logits: torch.Tensor) -> torch.Tensor:
+    """Return C-zmargin scores using the sample std used by top-nsigma."""
+    _validate_logits(logits)
+    working = _zmargin_working_logits(logits)
+    row_max, sigma = _zmargin_row_statistics(logits)
+    margins = row_max.unsqueeze(-1) - working
+    return _zero_safe_zmargin(margins, sigma.unsqueeze(-1))
+
+
+def zmargin_nonconformity(
+    logits: torch.Tensor,
+    target_ids: torch.Tensor,
+) -> torch.Tensor:
+    """Return target C-zmargin scores with bounded-vocabulary chunk storage."""
+    _validate_logits(logits)
+    _validate_target_ids(logits, target_ids)
+    row_max, sigma = _zmargin_row_statistics(logits)
+    accumulation_dtype = row_max.dtype
+    targets = (
+        logits.gather(-1, target_ids.unsqueeze(-1))
+        .squeeze(-1)
+        .to(accumulation_dtype)
+    )
+    return _zero_safe_zmargin(row_max - targets, sigma)
+
+
 def _validate_nu_inputs(
     logits: torch.Tensor,
     token_freq_table: torch.Tensor,
