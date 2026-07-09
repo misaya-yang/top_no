@@ -7,5 +7,6 @@
 - [x] Add an offline config+tokenizer-only CLI over exact manifest/JSONL input.
 - [x] Use model config vocabulary size and keep model weights unloaded.
 - [x] Add fake-tokenizer and mock-offline-CLI tests.
-- [ ] Run a real pinned Qwen tokenizer smoke on the server.
-- [ ] Obtain independent review, merge, and push.
+- [x] Run a real pinned Qwen tokenizer smoke on the server.
+- [x] Obtain independent review with no remaining Critical/Important findings.
+- [ ] Merge and push the repaired slice.

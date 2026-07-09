@@ -138,6 +138,14 @@ class FrequencyTableTests(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, message):
                         self.load(sidecar, **overrides)
 
+            for invalid_eos in (True, 3, -1):
+                with self.subTest(invalid_eos=invalid_eos):
+                    with self.assertRaisesRegex(
+                        ValueError,
+                        "expected_eos_token_id.*(integer|range)",
+                    ):
+                        self.load(sidecar, expected_eos_token_id=invalid_eos)
+
     def test_invalid_counts_are_rejected(self):
         invalid = [
             torch.tensor([1, -1, 2], dtype=torch.int64),
@@ -156,6 +164,24 @@ class FrequencyTableTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "exclusion_token_ids"):
             self.make_metadata(counts, exclusions=(3,))
+
+    def test_eos_boundary_count_must_equal_document_count(self):
+        with self.assertRaisesRegex(ValueError, "EOS boundary count"):
+            self.make_metadata(torch.tensor([4, 0, 2], dtype=torch.int64))
+
+    def test_legacy_sidecar_without_v2_policy_fails_closed(self):
+        counts = torch.tensor([4, 0, 1], dtype=torch.int64)
+        metadata = self.make_metadata(counts)
+        with tempfile.TemporaryDirectory() as tmp:
+            sidecar = save_frequency_table(counts, metadata, Path(tmp))
+            payload = json.loads(sidecar.read_text())
+            del payload["metadata"]["artifact_schema_version"]
+            del payload["metadata"]["tokenization_policy"]
+            del payload["metadata"]["eos_token_id"]
+            sidecar.write_text(json.dumps(payload))
+
+            with self.assertRaisesRegex(ValueError, "metadata fields mismatch"):
+                load_frequency_table_metadata(sidecar)
 
     def test_special_token_ids_are_sorted_unique_integers(self):
         class Tokenizer:

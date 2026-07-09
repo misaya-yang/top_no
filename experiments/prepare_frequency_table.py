@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 
 from transformers import AutoConfig, AutoTokenizer
@@ -36,6 +37,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    if re.fullmatch(r"[0-9a-f]{40}", args.revision) is None:
+        raise ValueError("revision must be a pinned 40-character lowercase commit SHA")
     tokenizer_id = args.tokenizer_id or args.model_id
     common = {
         "revision": args.revision,
@@ -46,14 +49,24 @@ def main() -> None:
     config = AutoConfig.from_pretrained(args.model_id, **common)
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_id, **common)
     config_revision = getattr(config, "_commit_hash", None)
-    if config_revision is not None and config_revision != args.revision:
+    if config_revision != args.revision:
         raise ValueError(
             "model revision mismatch: "
             f"config={config_revision!r} requested={args.revision!r}"
         )
+    tokenizer_init = getattr(tokenizer, "init_kwargs", None)
+    tokenizer_revision = (
+        tokenizer_init.get("_commit_hash")
+        if isinstance(tokenizer_init, dict)
+        else None
+    )
+    if tokenizer_revision != args.revision:
+        raise ValueError(
+            "tokenizer revision mismatch: "
+            f"tokenizer={tokenizer_revision!r} requested={args.revision!r}"
+        )
     resolved_tokenizer_id, resolved_revision = runtime_tokenizer_identity(
         tokenizer,
-        resolved_model_revision=args.revision,
     )
     if resolved_tokenizer_id != tokenizer_id:
         raise ValueError(

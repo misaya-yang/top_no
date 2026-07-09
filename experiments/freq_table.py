@@ -329,6 +329,7 @@ def make_frequency_table_metadata(
         num_tokens=int(canonical.sum().item()),
     )
     _validate_metadata(metadata)
+    _validate_counts_against_metadata(canonical, metadata)
     return metadata
 
 
@@ -521,6 +522,12 @@ def load_frequency_table(
         expected_exclusion_token_ids,
         expected_vocab_size,
     )
+    normalized_expected_eos = _require_integer(
+        expected_eos_token_id,
+        "expected_eos_token_id",
+    )
+    if normalized_expected_eos < 0 or normalized_expected_eos >= expected_vocab_size:
+        raise ValueError("expected_eos_token_id is out of range")
     checks = {
         "model_id": (metadata.model_id, expected_model_id),
         "tokenizer_id": (metadata.tokenizer_id, expected_tokenizer_id),
@@ -530,7 +537,7 @@ def load_frequency_table(
         ),
         "vocab_size": (metadata.vocab_size, expected_vocab_size),
         "exclusion_token_ids": (metadata.exclusion_token_ids, expected_exclusions),
-        "eos_token_id": (metadata.eos_token_id, expected_eos_token_id),
+        "eos_token_id": (metadata.eos_token_id, normalized_expected_eos),
     }
     for field_name, (actual, expected) in checks.items():
         if actual != expected:

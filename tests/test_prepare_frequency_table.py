@@ -29,14 +29,78 @@ except ModuleNotFoundError:
 
 @unittest.skipIf(torch is None, "torch is not installed in this Python environment")
 class PrepareFrequencyTableTests(unittest.TestCase):
+    def test_cli_rejects_branch_names_and_missing_resolved_hashes(self):
+        base = [
+            "prepare_frequency_table.py",
+            "--document-jsonl",
+            "unused.jsonl",
+            "--source-manifest",
+            "unused-manifest.json",
+            "--model-id",
+            "fixture/model",
+            "--revision",
+            "main",
+            "--output-dir",
+            "unused-output",
+        ]
+        with patch("sys.argv", base), patch.object(
+            prepare_frequency_table.AutoConfig,
+            "from_pretrained",
+        ) as config_load:
+            with self.assertRaisesRegex(ValueError, "40-character.*commit"):
+                prepare_frequency_table.main()
+        config_load.assert_not_called()
+
+        revision = "b" * 40
+
+        class MissingConfigHash:
+            vocab_size = 6
+            _commit_hash = None
+
+        class MissingTokenizerHash:
+            name_or_path = "fixture/model"
+            init_kwargs = {}
+
+        pinned = list(base)
+        pinned[pinned.index("main")] = revision
+        with patch("sys.argv", pinned), patch.object(
+            prepare_frequency_table.AutoConfig,
+            "from_pretrained",
+            return_value=MissingConfigHash(),
+        ), patch.object(
+            prepare_frequency_table.AutoTokenizer,
+            "from_pretrained",
+            return_value=MissingTokenizerHash(),
+        ):
+            with self.assertRaisesRegex(ValueError, "model revision mismatch"):
+                prepare_frequency_table.main()
+
+        class PinnedConfig:
+            vocab_size = 6
+            _commit_hash = revision
+
+        with patch("sys.argv", pinned), patch.object(
+            prepare_frequency_table.AutoConfig,
+            "from_pretrained",
+            return_value=PinnedConfig(),
+        ), patch.object(
+            prepare_frequency_table.AutoTokenizer,
+            "from_pretrained",
+            return_value=MissingTokenizerHash(),
+        ):
+            with self.assertRaisesRegex(ValueError, "tokenizer revision mismatch"):
+                prepare_frequency_table.main()
+
     def test_offline_cli_builds_loadable_eos_aware_artifact_without_model_weights(self):
+        revision = "a" * 40
+
         class Config:
             vocab_size = 6
-            _commit_hash = "revision-1"
+            _commit_hash = revision
 
         class Tokenizer:
             name_or_path = "fixture/model"
-            init_kwargs = {"_commit_hash": "revision-1"}
+            init_kwargs = {"_commit_hash": revision}
             eos_token_id = 5
             all_special_ids = [0, 5]
 
@@ -87,7 +151,7 @@ class PrepareFrequencyTableTests(unittest.TestCase):
                 "--model-id",
                 "fixture/model",
                 "--revision",
-                "revision-1",
+                revision,
                 "--output-dir",
                 str(output),
             ]
@@ -109,7 +173,7 @@ class PrepareFrequencyTableTests(unittest.TestCase):
                 sidecar,
                 expected_model_id="fixture/model",
                 expected_tokenizer_id="fixture/model",
-                expected_tokenizer_revision="revision-1",
+                expected_tokenizer_revision=revision,
                 expected_vocab_size=6,
                 expected_exclusion_token_ids=(0,),
                 expected_eos_token_id=5,
@@ -121,7 +185,7 @@ class PrepareFrequencyTableTests(unittest.TestCase):
         self.assertEqual(payload["num_tokens"], 7)
         for mocked in (config_load, tokenizer_load):
             self.assertTrue(mocked.call_args.kwargs["local_files_only"])
-            self.assertEqual(mocked.call_args.kwargs["revision"], "revision-1")
+            self.assertEqual(mocked.call_args.kwargs["revision"], revision)
 
 
 if __name__ == "__main__":
