@@ -8,6 +8,7 @@ import json
 import re
 from pathlib import Path
 
+from huggingface_hub.utils import HFValidationError, validate_repo_id
 from transformers import AutoConfig, AutoTokenizer
 from transformers.utils.hub import cached_file
 
@@ -36,11 +37,23 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def validate_hub_repo_id(repo_id: str, *, label: str) -> None:
+    """Reject mutable local paths before resolving an immutable Hub snapshot."""
+    if Path(repo_id).expanduser().exists():
+        raise ValueError(f"{label} must be a Hugging Face Hub repo ID, not a local path")
+    try:
+        validate_repo_id(repo_id)
+    except HFValidationError as exc:
+        raise ValueError(f"{label} must be a valid Hugging Face Hub repo ID") from exc
+
+
 def main() -> None:
     args = parse_args()
     if re.fullmatch(r"[0-9a-f]{40}", args.revision) is None:
         raise ValueError("revision must be a pinned 40-character lowercase commit SHA")
     tokenizer_id = args.tokenizer_id or args.model_id
+    validate_hub_repo_id(args.model_id, label="model_id")
+    validate_hub_repo_id(tokenizer_id, label="tokenizer_id")
     common = {
         "revision": args.revision,
         "cache_dir": args.cache_dir,

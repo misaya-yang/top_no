@@ -29,6 +29,50 @@ except ModuleNotFoundError:
 
 @unittest.skipIf(torch is None, "torch is not installed in this Python environment")
 class PrepareFrequencyTableTests(unittest.TestCase):
+    def test_cli_rejects_mutable_local_paths_that_mimic_hub_snapshots(self):
+        revision = "c" * 40
+        with tempfile.TemporaryDirectory() as tmp:
+            fake_snapshot = Path(tmp) / "snapshots" / revision
+            fake_snapshot.mkdir(parents=True)
+            base = [
+                "prepare_frequency_table.py",
+                "--document-jsonl",
+                "unused.jsonl",
+                "--source-manifest",
+                "unused-manifest.json",
+                "--model-id",
+                "fixture/model",
+                "--revision",
+                revision,
+                "--output-dir",
+                "unused-output",
+            ]
+            cases = (
+                ("--model-id", str(fake_snapshot), "model_id"),
+                ("--tokenizer-id", str(fake_snapshot), "tokenizer_id"),
+            )
+            for flag, value, expected_label in cases:
+                with self.subTest(flag=flag):
+                    argv = list(base)
+                    if flag == "--model-id":
+                        argv[argv.index("fixture/model")] = value
+                    else:
+                        argv.extend((flag, value))
+                    with patch("sys.argv", argv), patch.object(
+                        prepare_frequency_table.AutoConfig,
+                        "from_pretrained",
+                    ) as config_load, patch.object(
+                        prepare_frequency_table.AutoTokenizer,
+                        "from_pretrained",
+                    ) as tokenizer_load:
+                        with self.assertRaisesRegex(
+                            ValueError,
+                            rf"{expected_label}.*Hub repo ID.*local path",
+                        ):
+                            prepare_frequency_table.main()
+                    config_load.assert_not_called()
+                    tokenizer_load.assert_not_called()
+
     def test_cli_rejects_branch_names_and_missing_resolved_hashes(self):
         base = [
             "prepare_frequency_table.py",
