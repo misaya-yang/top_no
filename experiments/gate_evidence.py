@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Iterable
 
 from conformal import GroupQuantile
+from frequency_buckets import METHOD_BUCKET_KIND
 from methods import (
     METHOD_REGISTRY_VERSION,
     MethodCalibration,
@@ -19,8 +20,8 @@ from methods import (
 )
 
 
-EVIDENCE_SCHEMA_VERSION = "icml2027-gate-evidence-v1"
-FREQUENCY_GROUP_KIND = "method-mass-quantile-v1"
+EVIDENCE_SCHEMA_VERSION = "icml2027-gate-evidence-v2"
+FREQUENCY_GROUP_KIND = METHOD_BUCKET_KIND
 TUNING_REQUIRED_METHOD_KEYS = frozenset(
     {
         "raps",

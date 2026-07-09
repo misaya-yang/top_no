@@ -18,6 +18,7 @@ except ModuleNotFoundError:
 if torch is not None:
     from gate_evidence import (  # noqa: E402
         EVIDENCE_SCHEMA_VERSION,
+        FREQUENCY_GROUP_KIND,
         EvidenceCell,
         EvidenceProvenance,
         GateEvidence,
@@ -130,7 +131,7 @@ class GateEvidenceTests(unittest.TestCase):
             position_policy_id=(
                 "one-position-per-document-v1" if grade == "G" else "stride-4-v1"
             ),
-            frequency_group_kind="method-mass-quantile-v1",
+            frequency_group_kind=FREQUENCY_GROUP_KIND,
             test_manifest_doc_count=2,
             calibration=calibration,
             provenance=provenance,

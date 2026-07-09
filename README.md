@@ -41,6 +41,8 @@ first calibrated prediction-set pipeline:
 - `experiments/gate_evidence.py` defines the content-addressed per-position
   `[G]`/`[E]` handoff needed for paired document-clustered gate inference;
   aggregate legacy metrics cannot be loaded as this evidence type.
+- `experiments/frequency_buckets.py` keeps Phase-0 diagnostic log10 bands
+  separate from future `D_tune`-fitted true-token-mass Mondrian buckets.
 - `top_p` uses the standard nucleus rule and keeps the crossing token.
 - Batch generation uses left padding, EOS-aware stopping, and generated-token-only
   metrics.

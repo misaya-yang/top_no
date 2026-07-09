@@ -120,6 +120,14 @@ hash. It can losslessly recompute coverage, mean size, and frequency-group
 summaries; evaluator emission, replay caches, and bootstrap inference are still
 pending.
 
+PR-2d freezes the separate Phase-0 diagnostic `B0..B8` log-count mapping and
+gives method-side true-token-mass buckets a distinct canonical kind. The repo's
+additional bucket-count, equal-frequency tie, strictest-delta floor, merge, and
+unseen-token choices are now pre-registered in
+`configs/frequency_bucket_policy_v1.json`. The builder remains pending and must
+bind exact `D_tune` rows plus the pinned frequency artifact; diagnostic bands
+must not be substituted into Mondrian calibration or CovGap.
+
 - Add `mondrian_quantiles`, score dithering, and a tuning path that reads
   `D_tune` only.
 - Complete `experiments/methods.py` for calibrated baselines: C-margin, C-logprob,

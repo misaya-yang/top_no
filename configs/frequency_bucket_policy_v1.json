@@ -1,0 +1,18 @@
+{
+  "bucket_kind": "method-true-token-mass-quantile-v1",
+  "delta_grid": [0.2, 0.1, 0.05, 0.02, 0.01],
+  "equal_frequency_tie_policy": "never-split",
+  "failure_policy": "reject-if-fewer-than-two-valid-buckets",
+  "fit_split": "tune",
+  "floor_multiplier": 5,
+  "floor_reference_delta": 0.01,
+  "initial_bucket_count": 8,
+  "initial_cut_policy": "cumulative-true-token-mass-right-crossing",
+  "merge_neighbor_policy": "smaller-tune-mass-then-lower-frequency",
+  "min_final_bucket_count": 2,
+  "minimum_tune_targets_per_bucket": 500,
+  "ordering_source": "pinned-d-freq-token-count",
+  "schema_version": "icml2027-method-bucket-policy-v1",
+  "underfloor_selection_policy": "smallest-count-then-lower-frequency",
+  "unseen_policy": "merge-into-lowest-nonzero-frequency-bucket"
+}
