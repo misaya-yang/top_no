@@ -1,4 +1,5 @@
 import json
+import math
 import sys
 import tempfile
 import unittest
@@ -21,6 +22,7 @@ if torch is not None:
         EvidenceProvenance,
         GateEvidence,
         PositionEvidence,
+        current_method_registry_sha256,
         gate_evidence_artifact_id,
         gate_evidence_test_rows_sha256,
         load_gate_evidence,
@@ -75,6 +77,7 @@ class GateEvidenceTests(unittest.TestCase):
     def provenance(self):
         return EvidenceProvenance(
             created_by_commit="a" * 40,
+            method_registry_sha256=current_method_registry_sha256(),
             effective_config_sha256=digest("1"),
             primary_config_sha256=digest("2"),
             preregistration_artifact_id=digest("3"),
@@ -165,14 +168,14 @@ class GateEvidenceTests(unittest.TestCase):
             evidence,
             records=(evidence.records[0], replace(evidence.records[0], target_index=12)),
         )
-        with self.assertRaisesRegex(ValueError, "\[G\].*doc_id"):
+        with self.assertRaisesRegex(ValueError, r"\[G\].*doc_id"):
             validate_gate_evidence(duplicate_doc)
 
         duplicate_cluster = replace(
             evidence,
             records=(evidence.records[0], replace(evidence.records[1], cluster_id="cluster-a")),
         )
-        with self.assertRaisesRegex(ValueError, "\[G\].*cluster_id"):
+        with self.assertRaisesRegex(ValueError, r"\[G\].*cluster_id"):
             validate_gate_evidence(duplicate_cluster)
 
         with self.assertRaisesRegex(ValueError, "test manifest document count"):
@@ -218,6 +221,10 @@ class GateEvidenceTests(unittest.TestCase):
         cases = (
             (replace(evidence.cell, model_revision="main"), "model_revision"),
             (replace(evidence.provenance, split_receipt_id="bad"), "split_receipt_id"),
+            (
+                replace(evidence.provenance, method_registry_sha256=digest("0")),
+                "method_registry_sha256",
+            ),
             (replace(evidence.records[0], set_size=9), "set_size"),
             (replace(evidence.records[0], target_token_id=8), "target_token_id"),
         )
@@ -245,6 +252,33 @@ class GateEvidenceTests(unittest.TestCase):
             )
         with self.assertRaisesRegex(ValueError, "calibration method_key"):
             validate_gate_evidence(replace(evidence, method_key="c_margin"))
+
+    def test_calibration_thresholds_must_match_finite_sample_rank(self):
+        evidence = self.evidence()
+        with self.assertRaisesRegex(ValueError, "conformal rank"):
+            validate_gate_evidence(
+                replace(
+                    evidence,
+                    calibration=replace(evidence.calibration, q_hat=float("inf")),
+                )
+            )
+
+        logits = torch.zeros((4, 2), dtype=torch.float64)
+        vacuous = calibrate_method(
+            "c_margin",
+            logits,
+            torch.zeros(4, dtype=torch.long),
+            delta=0.05,
+            uniforms=torch.zeros_like(logits),
+        )
+        self.assertTrue(math.isinf(vacuous.q_hat))
+        impossible = replace(
+            self.evidence(),
+            delta=0.05,
+            calibration=replace(vacuous, q_hat=1.0),
+        )
+        with self.assertRaisesRegex(ValueError, "conformal rank"):
+            validate_gate_evidence(impossible)
 
     def test_registry_roles_partition_comparators_without_name_substrings(self):
         evidence = (
@@ -274,6 +308,20 @@ class GateEvidenceTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "frozen cell"):
             partition_gate_evidence((evidence[0], mismatched_rows))
+
+        conflicting_protocol = replace(
+            evidence[2],
+            provenance=replace(
+                evidence[2].provenance,
+                primary_config_sha256=digest("0"),
+                preregistration_artifact_id=digest("1"),
+                gate_thresholds_sha256=digest("2"),
+                randomization_artifact_sha256=digest("3"),
+                test_position_salt_sha256=digest("5"),
+            ),
+        )
+        with self.assertRaisesRegex(ValueError, "frozen cell"):
+            partition_gate_evidence((evidence[0], conflicting_protocol))
 
     def test_records_require_canonical_order(self):
         evidence = self.evidence()

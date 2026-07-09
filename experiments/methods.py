@@ -52,6 +52,7 @@ class MethodCalibration:
     params: tuple[tuple[str, float], ...]
     group_axis: str | None
     dither_epsilon: float | None
+    min_bucket: int | None
 
 
 _REGISTRY = (
@@ -305,6 +306,9 @@ def calibrate_method(
             expected_groups=expected_groups,
             min_bucket=min_bucket,
         )
+        effective_min_bucket = (
+            math.ceil(5.0 / float(delta)) if min_bucket is None else min_bucket
+        )
         q_hat = None
         group_axis = definition.conditioning_axis
     else:
@@ -313,6 +317,7 @@ def calibrate_method(
         q_hat = conformal_quantile(scores, delta)
         group_quantiles = ()
         group_axis = None
+        effective_min_bucket = None
 
     return MethodCalibration(
         registry_version=METHOD_REGISTRY_VERSION,
@@ -324,6 +329,7 @@ def calibrate_method(
         params=normalized_params,
         group_axis=group_axis,
         dither_epsilon=None if method_key == "aps" else float(dither_epsilon),
+        min_bucket=effective_min_bucket,
     )
 
 

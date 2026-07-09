@@ -15,6 +15,7 @@ from methods import (
     METHOD_REGISTRY_VERSION,
     MethodCalibration,
     get_method_definition,
+    method_registry,
 )
 
 
@@ -47,6 +48,7 @@ class EvidenceCell:
 @dataclass(frozen=True)
 class EvidenceProvenance:
     created_by_commit: str
+    method_registry_sha256: str
     effective_config_sha256: str
     primary_config_sha256: str
     preregistration_artifact_id: str
@@ -104,6 +106,11 @@ def _canonical_json(value: object) -> bytes:
         ensure_ascii=False,
         allow_nan=False,
     ).encode("utf-8")
+
+
+def current_method_registry_sha256() -> str:
+    payload = [asdict(definition) for definition in method_registry()]
+    return hashlib.sha256(_canonical_json(payload)).hexdigest()
 
 
 def _require_nonempty(value: object, field_name: str) -> str:
@@ -194,12 +201,19 @@ def _validate_calibration(
             raise ValueError("Mondrian calibration group_axis mismatch")
         if not calibration.group_quantiles:
             raise ValueError("Mondrian calibration needs group_quantiles")
+        _require_positive_int(calibration.min_bucket, "calibration min_bucket")
     else:
         if calibration.q_hat is None:
             raise ValueError("global calibration is missing q_hat")
         _validate_threshold(calibration.q_hat, "calibration q_hat")
         if calibration.group_axis is not None or calibration.group_quantiles:
             raise ValueError("global calibration cannot contain Mondrian groups")
+        if calibration.min_bucket is not None:
+            raise ValueError("global calibration cannot contain min_bucket")
+        rank = math.ceil((calibration.n_calibration + 1) * (1.0 - delta))
+        rank_exceeds = rank > calibration.n_calibration
+        if rank_exceeds != math.isinf(float(calibration.q_hat)):
+            raise ValueError("global q_hat is inconsistent with conformal rank")
 
     if method_key == "aps":
         if calibration.dither_epsilon is not None:
@@ -238,6 +252,16 @@ def _validate_calibration(
             raise ValueError("absent calibration group must have count zero")
         if item.reason != "absent" and item.count == 0:
             raise ValueError("observed calibration group must have positive count")
+        if is_mondrian and item.count > 0:
+            if item.count < calibration.min_bucket:
+                expected_reason = "below_min_bucket"
+            else:
+                rank = math.ceil((item.count + 1) * (1.0 - delta))
+                expected_reason = "rank_exceeds_n" if rank > item.count else "finite"
+            if item.reason != expected_reason:
+                raise ValueError(
+                    "calibration group reason is inconsistent with conformal rank/min_bucket"
+                )
         seen_groups.add(item.group)
         previous = item.group
         total += item.count
@@ -292,6 +316,8 @@ def validate_gate_evidence(evidence: GateEvidence) -> None:
         if item.name in {"created_by_commit", "tuning_artifact_id"}:
             continue
         _require_sha256(getattr(evidence.provenance, item.name), item.name)
+    if evidence.provenance.method_registry_sha256 != current_method_registry_sha256():
+        raise ValueError("method_registry_sha256 does not match the runtime registry")
     if evidence.provenance.tuning_artifact_id is not None:
         _require_sha256(
             evidence.provenance.tuning_artifact_id,
@@ -405,6 +431,7 @@ def _calibration_payload(calibration: MethodCalibration) -> dict[str, object]:
         "params": [[key, value] for key, value in calibration.params],
         "group_axis": calibration.group_axis,
         "dither_epsilon": calibration.dither_epsilon,
+        "min_bucket": calibration.min_bucket,
     }
 
 
@@ -472,6 +499,7 @@ def _parse_calibration(payload: object) -> MethodCalibration:
         "params",
         "group_axis",
         "dither_epsilon",
+        "min_bucket",
     }
     payload = _require_keys(payload, expected, "calibration")
     raw_groups = payload["group_quantiles"]
@@ -505,6 +533,7 @@ def _parse_calibration(payload: object) -> MethodCalibration:
         params=tuple((item[0], item[1]) for item in raw_params),
         group_axis=payload["group_axis"],
         dither_epsilon=payload["dither_epsilon"],
+        min_bucket=payload["min_bucket"],
     )
 
 
@@ -622,6 +651,22 @@ def partition_gate_evidence(
             != reference.provenance.calibration_manifest_sha256
             or item.provenance.calibration_rows_sha256
             != reference.provenance.calibration_rows_sha256
+            or item.provenance.created_by_commit
+            != reference.provenance.created_by_commit
+            or item.provenance.method_registry_sha256
+            != reference.provenance.method_registry_sha256
+            or item.provenance.primary_config_sha256
+            != reference.provenance.primary_config_sha256
+            or item.provenance.preregistration_artifact_id
+            != reference.provenance.preregistration_artifact_id
+            or item.provenance.gate_thresholds_sha256
+            != reference.provenance.gate_thresholds_sha256
+            or item.provenance.randomization_artifact_sha256
+            != reference.provenance.randomization_artifact_sha256
+            or item.provenance.calibration_position_salt_sha256
+            != reference.provenance.calibration_position_salt_sha256
+            or item.provenance.test_position_salt_sha256
+            != reference.provenance.test_position_salt_sha256
             or item.provenance.frequency_table_artifact_id
             != reference.provenance.frequency_table_artifact_id
             or item.provenance.split_receipt_id

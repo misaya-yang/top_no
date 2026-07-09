@@ -28,12 +28,28 @@ Local macOS:
 python3 -m compileall experiments                         PASS
 for script in scripts/*.sh; do bash -n "$script"; done   PASS
 git diff --check                                          PASS
-python3 -m unittest discover tests                        171/171 PASS
+python3 -m unittest discover tests                        172/172 PASS
 ```
 
-The ten new tests cover canonical `+inf` serialization, content/filename hash
+RTX 5090 server:
+
+```text
+python -m compileall experiments                          PASS
+for script in scripts/*.sh; do bash -n "$script"; done   PASS
+python -m unittest discover tests                         172 run, 171 PASS,
+                                                         1 MPS-only skip
+```
+
+The eleven new tests cover canonical `+inf` serialization, content/filename hash
 binding, tamper rejection, strict wrapper schemas, `[G]`/`[E]` identity rules,
 vocabulary/provenance bounds, tuning and calibration identity, lossless summary
 recomputation, shared test-row pairing, canonical order, and registry-role
 partitioning without method-name substrings.
 
+Independent review found and drove two Important repairs. The loader now
+recomputes the finite-sample rank for global and every Mondrian calibration,
+with the effective `min_bucket` included in the canonical method artifact, so
+impossible finite/`+inf` thresholds and reasons are rejected. Comparator
+partitioning now also requires shared primary/preregistered/gate/randomization
+and position-salt provenance. The reviewer reran both counterexamples plus a
+Mondrian forgery and found no remaining Critical/Important issues.

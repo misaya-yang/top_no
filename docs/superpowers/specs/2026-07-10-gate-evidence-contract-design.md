@@ -13,6 +13,8 @@ One content-addressed JSON artifact represents one
 `(model, revision, domain, method, delta, evidence grade)` cell. It binds:
 
 - canonical method registry version/key and its immutable calibration result;
+- canonical method-registry content hash, preventing role/status drift without
+  an explicit artifact change;
 - `[G]` or `[E]` evidence grade;
 - effective config, frequency table, split receipt, cross-corpus receipt,
   calibration/test manifests, and method-side frequency-bucket artifact IDs;
