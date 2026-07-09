@@ -285,7 +285,10 @@ def validate_runtime_model_and_tokenizer(
             f"model_revision mismatch: runtime={model_revision!r} "
             f"expected={expected_revision!r}"
         )
-    tokenizer_id, tokenizer_revision = runtime_tokenizer_identity(tokenizer)
+    tokenizer_id, tokenizer_revision = runtime_tokenizer_identity(
+        tokenizer,
+        resolved_model_revision=model_revision,
+    )
     if expected_revision is not None and tokenizer_revision != expected_revision:
         raise ValueError(
             f"tokenizer_revision mismatch: runtime={tokenizer_revision!r} "

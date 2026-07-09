@@ -44,17 +44,33 @@ def special_token_ids(tokenizer: Any) -> tuple[int, ...]:
     )
 
 
-def runtime_tokenizer_identity(tokenizer: Any) -> tuple[str, str | None]:
-    """Return the tokenizer ID and resolved Hub commit exposed at runtime."""
+def runtime_tokenizer_identity(
+    tokenizer: Any,
+    resolved_model_revision: str | None = None,
+) -> tuple[str, str | None]:
+    """Return the tokenizer ID and commit resolved at the shared load boundary."""
     tokenizer_id = getattr(tokenizer, "name_or_path", None)
     if not isinstance(tokenizer_id, str) or not tokenizer_id.strip():
         raise ValueError("runtime tokenizer_id is unavailable")
     init_kwargs = getattr(tokenizer, "init_kwargs", None)
-    revision = init_kwargs.get("_commit_hash") if isinstance(init_kwargs, dict) else None
-    if revision is not None and (
-        not isinstance(revision, str) or not revision.strip()
+    tokenizer_revision = (
+        init_kwargs.get("_commit_hash") if isinstance(init_kwargs, dict) else None
+    )
+    for revision in (tokenizer_revision, resolved_model_revision):
+        if revision is not None and (
+            not isinstance(revision, str) or not revision.strip()
+        ):
+            raise ValueError("runtime tokenizer_revision must be a non-empty string")
+    if (
+        tokenizer_revision is not None
+        and resolved_model_revision is not None
+        and tokenizer_revision != resolved_model_revision
     ):
-        raise ValueError("runtime tokenizer_revision must be a non-empty string")
+        raise ValueError(
+            "tokenizer_revision mismatch between tokenizer and resolved model: "
+            f"tokenizer={tokenizer_revision!r} model={resolved_model_revision!r}"
+        )
+    revision = tokenizer_revision or resolved_model_revision
     return tokenizer_id, revision
 
 

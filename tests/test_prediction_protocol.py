@@ -447,6 +447,48 @@ class PredictionProtocolTests(unittest.TestCase):
                 texts=[],
             )
 
+    def test_runtime_tokenizer_uses_resolved_model_revision_when_hub_omits_it(self):
+        _, frequency = self.write_manifest("freq", "freq")
+        table_path = self.write_frequency_table(frequency)
+
+        class Tokenizer:
+            all_special_ids = [1]
+            name_or_path = "fixture/model"
+            init_kwargs = {}
+
+            def __len__(self):
+                return 3
+
+        class ModelConfig:
+            vocab_size = 3
+            _commit_hash = "model-commit"
+
+        class Model:
+            config = ModelConfig()
+
+            @staticmethod
+            def get_input_embeddings():
+                return None
+
+            @staticmethod
+            def get_output_embeddings():
+                return None
+
+        counts, metadata = resolve_token_counts(
+            Tokenizer(),
+            Model(),
+            {
+                "model": "fixture/model",
+                "model_revision": "model-commit",
+                "frequency_table": str(table_path),
+                "allow_legacy_protocol": True,
+            },
+            texts=[],
+        )
+
+        self.assertEqual(counts.tolist(), [4, 0, 7])
+        self.assertEqual(metadata.tokenizer_revision, "model-commit")
+
 
 if __name__ == "__main__":
     unittest.main()
