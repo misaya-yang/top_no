@@ -11,6 +11,7 @@ import torch  # noqa: E402
 
 from document_store import BoundDocument  # noqa: E402
 from phase0_reliability import (  # noqa: E402
+    _frequency_sidecar,
     consume_document_rows,
     iter_document_logits,
     load_checkpoint,
@@ -150,6 +151,19 @@ class Phase0RunnerTests(unittest.TestCase):
             self.assertEqual(load_checkpoint(path, expected_identity="a" * 64), payload)
             with self.assertRaisesRegex(ValueError, "identity"):
                 load_checkpoint(path, expected_identity="b" * 64)
+
+    def test_frequency_sidecar_accepts_one_sha256_named_json(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            sidecar_dir = root / "frequency"
+            sidecar_dir.mkdir()
+            sidecar = sidecar_dir / ("a" * 64 + ".json")
+            sidecar.write_text("{}", encoding="utf-8")
+
+            self.assertEqual(
+                _frequency_sidecar(root, "frequency"),
+                sidecar.resolve(),
+            )
 
 
 if __name__ == "__main__":
