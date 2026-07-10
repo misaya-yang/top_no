@@ -183,3 +183,28 @@ python3 -m compileall experiments
 for script in scripts/*.sh; do bash -n "$script"; done
 python3 -m unittest discover tests
 ```
+
+## Two-Hour Phase-0 GPU Pilot
+
+The replication-first Phase-0 queue measures the active paper premise before
+the calibrated prediction-set gate is complete. It runs Qwen2.5-3B and 7B on
+two frozen domains, with a global 110-minute deadline and resumable per-cell
+checkpoints. All outputs are explicitly `E-pilot` and noncitable; a positive
+pilot only recommends the full pre-registered Phase-0 run.
+
+The server data root must follow
+`docs/superpowers/specs/2026-07-10-phase0-two-hour-queue-design.md`. Preflight
+validates every frozen split, independent frequency artifact, cross-corpus
+receipt, and cached model revision before the funded queue clock begins.
+
+```bash
+cd /root/neurips2027
+source /root/autodl-tmp/venvs/neurips2027/bin/activate
+TOPNO_PHASE0_DATA_ROOT=/root/autodl-tmp/top_no_phase0 \
+  bash scripts/run_phase0_two_hour_queue.sh
+```
+
+The queue writes cell checkpoints and summaries under
+`results/phase0_two_hour/`, followed by `decision_memo.json` and
+`queue_status.json`. Missing or ambiguous input artifacts abort before model
+allocation; the queue never falls back to the legacy prediction-set runner.

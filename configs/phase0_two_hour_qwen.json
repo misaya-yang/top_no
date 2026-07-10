@@ -1,0 +1,97 @@
+{
+  "schema_version": "icml2027-phase0-two-hour-matrix-v1",
+  "queue_wall_seconds": 6600,
+  "cell_wall_seconds": 1500,
+  "summary_reserve_seconds": 300,
+  "minimum_start_seconds": 360,
+  "calibration_position_salt": "icml2027-phase0-calibration-v1",
+  "test_position_salt": "icml2027-phase0-test-v1",
+  "frequency_manifest": "frequency/freq.manifest.json",
+  "frequency_document_jsonl": "frequency/documents.jsonl",
+  "models": [
+    {
+      "key": "qwen3b",
+      "model_id": "Qwen/Qwen2.5-3B",
+      "revision": "3aab1f1954e9cc14eb9509a215f9e5ca08227a9b",
+      "frequency_dir": "frequency/qwen2.5-3b",
+      "trust_remote_code": true
+    },
+    {
+      "key": "qwen7b",
+      "model_id": "Qwen/Qwen2.5-7B",
+      "revision": "d149729398750b98c0af14eb82c78cfe92750796",
+      "frequency_dir": "frequency/qwen2.5-7b",
+      "trust_remote_code": true
+    }
+  ],
+  "domains": [
+    {
+      "key": "web",
+      "document_jsonl": "domains/web/documents.jsonl",
+      "tune_manifest": "domains/web/splits/tune_manifest.json",
+      "calibration_manifest": "domains/web/splits/cal_manifest.json",
+      "test_manifest": "domains/web/splits/test_manifest.json",
+      "split_receipt": "domains/web/splits/split_receipt.json",
+      "cross_corpus_receipt": "domains/web/cross_corpus.json"
+    },
+    {
+      "key": "math",
+      "document_jsonl": "domains/math/documents.jsonl",
+      "tune_manifest": "domains/math/splits/tune_manifest.json",
+      "calibration_manifest": "domains/math/splits/cal_manifest.json",
+      "test_manifest": "domains/math/splits/test_manifest.json",
+      "split_receipt": "domains/math/splits/split_receipt.json",
+      "cross_corpus_receipt": "domains/math/cross_corpus.json"
+    }
+  ],
+  "cells": [
+    {
+      "key": "3b_web",
+      "model_key": "qwen3b",
+      "domain_key": "web",
+      "batch_size": 2,
+      "max_positions": 80000,
+      "max_length": 512,
+      "min_context": 16,
+      "stride": 4,
+      "min_true_count": 20,
+      "seed": 1729
+    },
+    {
+      "key": "3b_math",
+      "model_key": "qwen3b",
+      "domain_key": "math",
+      "batch_size": 2,
+      "max_positions": 80000,
+      "max_length": 512,
+      "min_context": 16,
+      "stride": 4,
+      "min_true_count": 20,
+      "seed": 1729
+    },
+    {
+      "key": "7b_web",
+      "model_key": "qwen7b",
+      "domain_key": "web",
+      "batch_size": 1,
+      "max_positions": 50000,
+      "max_length": 512,
+      "min_context": 16,
+      "stride": 4,
+      "min_true_count": 20,
+      "seed": 1729
+    },
+    {
+      "key": "7b_math",
+      "model_key": "qwen7b",
+      "domain_key": "math",
+      "batch_size": 1,
+      "max_positions": 50000,
+      "max_length": 512,
+      "min_context": 16,
+      "stride": 4,
+      "min_true_count": 20,
+      "seed": 1729
+    }
+  ]
+}
