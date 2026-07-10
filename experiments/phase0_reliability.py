@@ -113,6 +113,8 @@ def iter_document_logits(
         raise ValueError("documents must contain BoundDocument values")
     if {item.role for item in ordered} != {"tune"}:
         raise ValueError("Phase-0 documents must come from the tune manifest")
+    if getattr(tokenizer, "padding_side", "right") != "right":
+        raise ValueError("Phase-0 causal extraction requires right padding")
 
     for start in range(0, len(ordered), batch_size):
         batch = ordered[start : start + batch_size]
@@ -330,6 +332,7 @@ def preflight_cell(matrix_path: Path, cell_key: str, data_root: Path) -> Preflig
     tokenizer = AutoTokenizer.from_pretrained(model["model_id"], **common)
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.padding_side = "right"
     resolved_model_revision = getattr(config, "_commit_hash", None)
     if resolved_model_revision != model["revision"]:
         raise ValueError("cached model config revision mismatch")

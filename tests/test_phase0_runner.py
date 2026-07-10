@@ -116,6 +116,25 @@ class Phase0RunnerTests(unittest.TestCase):
         self.assertEqual(len(result.document_stats), 1)
         self.assertEqual(result.document_stats[0].doc_id, "a")
 
+    def test_left_padding_is_rejected_before_forward(self):
+        tokenizer = FakeTokenizer({"text-a": list(range(20)), "text-b": list(range(20))})
+        tokenizer.padding_side = "left"
+
+        with self.assertRaisesRegex(ValueError, "right padding"):
+            list(
+                iter_document_logits(
+                    FakeModel(),
+                    tokenizer,
+                    self.documents(),
+                    device=torch.device("cpu"),
+                    max_length=64,
+                    min_context=16,
+                    stride=4,
+                    batch_size=2,
+                    excluded_target_ids=set(),
+                )
+            )
+
     def test_checkpoint_round_trip_binds_identity(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "checkpoint.pt"

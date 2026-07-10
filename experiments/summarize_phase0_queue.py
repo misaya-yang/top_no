@@ -59,23 +59,29 @@ def _cell_record(cell: object) -> dict[str, object]:
     informative = bool(analysis.get("informative")) and all(
         bool(item.get("informative")) for item in halves
     )
-    effect = _finite_number(analysis.get("max_abs_shift"), "max_abs_shift")
-    signed = _finite_number(
-        analysis.get("rare_minus_reference_shift"),
-        "rare_minus_reference_shift",
-    )
-    half_signed = tuple(
-        _finite_number(item.get("rare_minus_reference_shift"), "half shift")
-        for item in halves
-    )
+    if informative:
+        effect = _finite_number(analysis.get("max_abs_shift"), "max_abs_shift")
+        signed = _finite_number(
+            analysis.get("rare_minus_reference_shift"),
+            "rare_minus_reference_shift",
+        )
+        half_signed = tuple(
+            _finite_number(item.get("rare_minus_reference_shift"), "half shift")
+            for item in halves
+        )
+        perm_effect = _finite_number(
+            permutation.get("max_abs_shift"),
+            "permutation max_abs_shift",
+        )
+    else:
+        effect = 0.0
+        signed = 0.0
+        half_signed = (0.0, 0.0)
+        perm_effect = 0.0
     half_stable = (
         informative
         and _sign(signed) != 0
         and all(_sign(value) == _sign(signed) for value in half_signed)
-    )
-    perm_effect = _finite_number(
-        permutation.get("max_abs_shift"),
-        "permutation max_abs_shift",
     )
     for field in ("cell_key", "model_key", "domain_key"):
         if not isinstance(cell.get(field), str) or not cell[field]:

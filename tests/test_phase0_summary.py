@@ -83,6 +83,27 @@ class Phase0SummaryTests(unittest.TestCase):
 
         self.assertEqual(memo["verdict"], "INSUFFICIENT")
 
+    def test_noninformative_cell_yields_insufficient_instead_of_error(self):
+        cell = self.cell("3b_web", "qwen3b", "web", effect=0.1)
+        cell["analysis"] = {
+            "informative": False,
+            "max_abs_shift": None,
+            "rare_minus_reference_shift": None,
+            "non_additive": False,
+        }
+        cell["permutation_analysis"] = {
+            "informative": False,
+            "max_abs_shift": None,
+        }
+        cell["half_analysis"] = [
+            {"informative": False, "rare_minus_reference_shift": None},
+            {"informative": False, "rare_minus_reference_shift": None},
+        ]
+
+        memo = summarize_cells([cell])
+
+        self.assertEqual(memo["verdict"], "INSUFFICIENT")
+
 
 if __name__ == "__main__":
     unittest.main()
