@@ -74,6 +74,8 @@ artifacts only.
 - `scripts/`: suite-level shell entrypoints.
 - `results/`: generated figures and JSON result artifacts.
 - `docs/paper/`: active claim stack, experiment mainline, and positioning notes.
+- `docs/paper/THEORY_OBLIGATIONS.md`: formal assumptions, inherited guarantees,
+  feature-optimality lens, and empirical claim boundaries.
 - `docs/fable5/`: external research critiques and planning documents.
 - `docs/reports/`: experiment writeups and summary reports.
 - `requirements.txt`: Python runtime dependencies.
