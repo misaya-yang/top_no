@@ -43,6 +43,7 @@ from splits import ManifestDocument, SelectedPosition, pooled_positions
 CHECKPOINT_SCHEMA_VERSION = "icml2027-phase0-checkpoint-v1"
 SUMMARY_SCHEMA_VERSION = "icml2027-phase0-summary-v1"
 MATRIX_SCHEMA_VERSION = "icml2027-phase0-two-hour-matrix-v1"
+CHECKPOINT_EVERY_DOCUMENTS = 32
 
 
 @dataclass(frozen=True)
@@ -213,6 +214,10 @@ def save_checkpoint(path: Path, payload: dict[str, object]) -> None:
     temporary = path.with_suffix(path.suffix + ".tmp")
     torch.save(payload, temporary)
     os.replace(temporary, path)
+
+
+def _checkpoint_is_due(completed_since_checkpoint: int) -> bool:
+    return completed_since_checkpoint >= CHECKPOINT_EVERY_DOCUMENTS
 
 
 def load_checkpoint(path: Path, *, expected_identity: str) -> dict[str, object]:
@@ -489,6 +494,19 @@ def run_cell(
         excluded_target_ids=preflight.exclusion_token_ids,
     )
     positions = sum(item.n_positions for item in stats)
+    completed_since_checkpoint = 0
+
+    def write_checkpoint() -> None:
+        save_checkpoint(
+            checkpoint_path,
+            {
+                "schema_version": CHECKPOINT_SCHEMA_VERSION,
+                "identity_sha256": identity,
+                "document_stats": [_stats_payload(value) for value in stats],
+                "processed_doc_ids": [value.doc_id for value in stats],
+            },
+        )
+
     for row in rows:
         if time.monotonic() - started >= wall_seconds:
             status = "PARTIAL"
@@ -509,17 +527,14 @@ def run_cell(
         )
         stats.append(item)
         positions += item.n_positions
-        save_checkpoint(
-            checkpoint_path,
-            {
-                "schema_version": CHECKPOINT_SCHEMA_VERSION,
-                "identity_sha256": identity,
-                "document_stats": [_stats_payload(value) for value in stats],
-                "processed_doc_ids": [value.doc_id for value in stats],
-            },
-        )
+        completed_since_checkpoint += 1
+        if _checkpoint_is_due(completed_since_checkpoint):
+            write_checkpoint()
+            completed_since_checkpoint = 0
     if not stats:
         raise RuntimeError("Phase-0 cell produced no eligible positions")
+    if completed_since_checkpoint or not checkpoint_path.exists():
+        write_checkpoint()
     merged = merge_document_stats(stats)
     analysis = analyze_grid(merged["num"], merged["den"], grid=grid)
     permutation_analysis = analyze_grid(

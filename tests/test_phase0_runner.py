@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "experiments"))
 
 import torch  # noqa: E402
+import phase0_reliability  # noqa: E402
 
 from document_store import BoundDocument  # noqa: E402
 from phase0_reliability import (  # noqa: E402
@@ -127,6 +128,13 @@ class Phase0RunnerTests(unittest.TestCase):
         self.assertEqual(result.status, "PARTIAL")
         self.assertEqual(len(result.document_stats), 1)
         self.assertEqual(result.document_stats[0].doc_id, "a")
+
+    def test_checkpoint_cadence_batches_document_serialization(self):
+        is_due = getattr(phase0_reliability, "_checkpoint_is_due", None)
+
+        self.assertIsNotNone(is_due)
+        self.assertFalse(is_due(31))
+        self.assertTrue(is_due(32))
 
     def test_left_padding_is_rejected_before_forward(self):
         tokenizer = FakeTokenizer({"text-a": list(range(20)), "text-b": list(range(20))})
