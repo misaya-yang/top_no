@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from cross_corpus import validate_cross_corpus_audit
+from cross_corpus import cross_corpus_receipt_sha256, validate_cross_corpus_audit
 from freq_table import (
     PROTOCOL_VERSION,
     load_frequency_table,
@@ -85,19 +85,19 @@ def _legacy_protocol(config: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def validate_protocol_inputs(config: dict[str, Any]) -> dict[str, Any]:
-    """Validate provenance before any model or dataset allocation.
+def validate_phase0_inputs(config: dict[str, Any]) -> dict[str, Any]:
+    """Validate Phase-0 provenance before any model or dataset allocation.
 
     PR-1a validates frequency artifacts, PR-1b provides split receipts, PR-1c
     binds those receipts to exact source text, and PR-1d recomputes a fixed
-    threshold-complete D_freq/evaluation near-duplicate proof. Non-legacy
-    requests remain blocked until the PR-2 conformal core and PR-3 gate land.
+    threshold-complete D_freq/evaluation near-duplicate proof. Phase 0 may run
+    after these checks without unblocking the paper-grade prediction-set path.
     """
     legacy_flag = config.get("allow_legacy_protocol", False)
     if not isinstance(legacy_flag, bool):
         raise ValueError("allow_legacy_protocol must be a boolean")
     if legacy_flag is True:
-        return _legacy_protocol(config)
+        raise ValueError("Phase-0 pilot forbids allow_legacy_protocol")
 
     required = [
         "frequency_table",
@@ -205,6 +205,29 @@ def validate_protocol_inputs(config: dict[str, Any]) -> dict[str, Any]:
                 f"cross-corpus evaluation manifest changed during validation: {role}"
             )
 
+    return {
+        "protocol_version": "icml2027-phase0-pilot-v1",
+        "evidence_grade": "E-pilot",
+        "paper_citable": False,
+        "effective_config_sha256": effective_config_sha256(config),
+        "frequency_table": reference,
+        "manifest_sha256s": {
+            role: manifest_sha256(manifests[role])
+            for role in ("freq", "tune", "cal", "test")
+        },
+        "cross_corpus_receipt_sha256": cross_corpus_receipt_sha256(cross_receipt),
+    }
+
+
+def validate_protocol_inputs(config: dict[str, Any]) -> dict[str, Any]:
+    """Validate provenance and retain the PR-2/PR-3 paper-run blocker."""
+    legacy_flag = config.get("allow_legacy_protocol", False)
+    if not isinstance(legacy_flag, bool):
+        raise ValueError("allow_legacy_protocol must be a boolean")
+    if legacy_flag is True:
+        return _legacy_protocol(config)
+
+    validate_phase0_inputs(config)
     missing_methods = ",".join(sorted(missing_paper_method_keys()))
     raise RuntimeError(
         "blocked_pending_pr2_pr3: PR-1 provenance, deterministic document splits, "

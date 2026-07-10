@@ -37,7 +37,11 @@ if torch is not None:
         make_frequency_table_metadata,
         save_frequency_table,
     )
-    from protocol import effective_config_sha256, validate_protocol_inputs  # noqa: E402
+    from protocol import (  # noqa: E402
+        effective_config_sha256,
+        validate_phase0_inputs,
+        validate_protocol_inputs,
+    )
     from splits import (  # noqa: E402
         DocumentManifest,
         ManifestDocument,
@@ -298,6 +302,22 @@ class PredictionProtocolTests(unittest.TestCase):
             "blocked_pending_pr2_pr3.*missing_paper_methods=cns,learned_h,ts_aps",
         ):
             validate_protocol_inputs(self.complete_config())
+
+    def test_phase0_protocol_returns_after_pr1_checks(self):
+        receipt = validate_phase0_inputs(self.complete_config())
+
+        self.assertEqual(receipt["protocol_version"], "icml2027-phase0-pilot-v1")
+        self.assertEqual(receipt["evidence_grade"], "E-pilot")
+        self.assertFalse(receipt["paper_citable"])
+        self.assertEqual(len(receipt["effective_config_sha256"]), 64)
+        self.assertEqual(
+            set(receipt["manifest_sha256s"]),
+            {"freq", "tune", "cal", "test"},
+        )
+
+    def test_phase0_protocol_forbids_legacy_mode(self):
+        with self.assertRaisesRegex(ValueError, "forbids allow_legacy_protocol"):
+            validate_phase0_inputs({"allow_legacy_protocol": True})
 
     def test_pr2_pr3_block_still_precedes_model_allocation(self):
         config_path = self.root / "complete-config.json"
