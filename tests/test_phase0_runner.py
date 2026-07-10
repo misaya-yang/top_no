@@ -2,6 +2,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -12,6 +13,7 @@ import torch  # noqa: E402
 from document_store import BoundDocument  # noqa: E402
 from phase0_reliability import (  # noqa: E402
     _frequency_sidecar,
+    _validate_cached_model_weights,
     consume_document_rows,
     iter_document_logits,
     load_checkpoint,
@@ -164,6 +166,36 @@ class Phase0RunnerTests(unittest.TestCase):
                 _frequency_sidecar(root, "frequency"),
                 sidecar.resolve(),
             )
+
+    def test_cached_model_weight_preflight_accepts_all_shards(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            index = root / "model.safetensors.index.json"
+            index.write_text("{}", encoding="utf-8")
+            shards = [root / "model-00001-of-00002.safetensors", root / "model-00002-of-00002.safetensors"]
+            for shard in shards:
+                shard.write_bytes(b"weights")
+
+            with (
+                mock.patch(
+                    "phase0_reliability.cached_file",
+                    side_effect=lambda _model, filename, **_kwargs: (
+                        str(index) if filename == index.name else None
+                    ),
+                ),
+                mock.patch(
+                    "phase0_reliability.get_checkpoint_shard_files",
+                    return_value=([str(path) for path in shards], {}),
+                ),
+            ):
+                resolved = _validate_cached_model_weights("org/model", "a" * 40)
+
+            self.assertEqual(resolved, tuple(path.resolve() for path in shards))
+
+    @mock.patch("phase0_reliability.cached_file", return_value=None)
+    def test_cached_model_weight_preflight_fails_when_weights_are_missing(self, _mocked):
+        with self.assertRaisesRegex(ValueError, "weights are not fully cached"):
+            _validate_cached_model_weights("org/model", "a" * 40)
 
 
 if __name__ == "__main__":

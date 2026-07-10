@@ -15,6 +15,7 @@ from typing import Callable, Collection, Iterable, Sequence
 
 import torch
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
+from transformers.utils.hub import cached_file, get_checkpoint_shard_files
 
 from document_store import BoundDocument, bind_split_documents
 from freq_table import (
@@ -71,6 +72,7 @@ class PreflightCell:
     token_counts: torch.Tensor
     exclusion_token_ids: tuple[int, ...]
     frequency_artifact_id: str
+    model_weight_paths: tuple[Path, ...]
 
 
 def _require_positive_int(value: object, name: str) -> int:
@@ -274,6 +276,43 @@ def _frequency_sidecar(data_root: Path, directory: object) -> Path:
     return matches[0]
 
 
+def _validate_cached_model_weights(model_id: str, revision: str) -> tuple[Path, ...]:
+    common = {
+        "revision": revision,
+        "local_files_only": True,
+        "_raise_exceptions_for_missing_entries": False,
+        "_raise_exceptions_for_connection_errors": False,
+    }
+    for index_name in (
+        "model.safetensors.index.json",
+        "pytorch_model.bin.index.json",
+    ):
+        index_path = cached_file(model_id, index_name, **common)
+        if index_path is None:
+            continue
+        try:
+            shard_paths, _ = get_checkpoint_shard_files(
+                model_id,
+                index_path,
+                revision=revision,
+                local_files_only=True,
+            )
+        except (OSError, ValueError) as exc:
+            raise ValueError("model weight shards are not fully cached") from exc
+        resolved = tuple(Path(path).resolve() for path in shard_paths)
+        if resolved and all(path.is_file() and path.stat().st_size > 0 for path in resolved):
+            return resolved
+        raise ValueError("model weight shards are not fully cached")
+    for filename in ("model.safetensors", "pytorch_model.bin"):
+        weight_path = cached_file(model_id, filename, **common)
+        if weight_path is None:
+            continue
+        resolved = Path(weight_path).resolve()
+        if resolved.is_file() and resolved.stat().st_size > 0:
+            return (resolved,)
+    raise ValueError("model weights are not fully cached")
+
+
 def preflight_cell(matrix_path: Path, cell_key: str, data_root: Path) -> PreflightCell:
     matrix = _load_matrix(matrix_path)
     models = _by_key(matrix.get("models"), "models")
@@ -340,6 +379,10 @@ def preflight_cell(matrix_path: Path, cell_key: str, data_root: Path) -> Preflig
         tokenizer,
         resolved_model_revision=resolved_model_revision,
     )
+    model_weight_paths = _validate_cached_model_weights(
+        str(model["model_id"]),
+        str(model["revision"]),
+    )
     token_counts, _ = load_frequency_table(
         frequency_sidecar,
         expected_model_id=model["model_id"],
@@ -361,6 +404,7 @@ def preflight_cell(matrix_path: Path, cell_key: str, data_root: Path) -> Preflig
         token_counts=token_counts,
         exclusion_token_ids=frequency_exclusion_token_ids(tokenizer),
         frequency_artifact_id=artifact_id,
+        model_weight_paths=model_weight_paths,
     )
 
 
@@ -535,6 +579,7 @@ def main() -> None:
                     "documents": len(preflight.documents),
                     "frequency_artifact_id": preflight.frequency_artifact_id,
                     "model_revision": preflight.model["revision"],
+                    "model_weight_shards": len(preflight.model_weight_paths),
                 },
                 sort_keys=True,
             )
