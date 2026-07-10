@@ -3,6 +3,14 @@
 Research repository for the ICML 2027 draft:
 **Frequency-Offset Margin Rules for Calibrated Language Model Decoding**.
 
+> **Project status: paused as of 2026-07-10.** The latest Qwen 3B/7B
+> Phase-0 pilot found suggestive margin-conditional frequency structure, but
+> the pre-registered decision remained `INSUFFICIENT` and the outputs are
+> noncitable `E-pilot` evidence. No additional rented-GPU experiments should be
+> launched unless the restart criteria in
+> [`docs/reports/2026-07-10-project-pause-handoff.md`](docs/reports/2026-07-10-project-pause-handoff.md)
+> are explicitly accepted first.
+
 Retired framing: earlier drafts used the title **Truncation Sampling as
 Hypothesis Testing** and argued for an identified frequency-dependent noise
 channel. That framing is now legacy. The active project treats token truncation

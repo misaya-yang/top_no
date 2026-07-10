@@ -12,6 +12,8 @@ autodl-tmp/
 
 # Results (large binary)
 results/*.pt
+results/server_runs/*.tar.gz
+results/server_runs/**/*.csv
 
 # OS
 .DS_Store
