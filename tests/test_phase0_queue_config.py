@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class Phase0QueueConfigTests(unittest.TestCase):
     def setUp(self):
         self.path = ROOT / "configs" / "phase0_two_hour_qwen.json"
+        self.script_path = ROOT / "scripts" / "run_phase0_two_hour_queue.sh"
 
     def test_matrix_freezes_order_budget_and_model_revisions(self):
         matrix = json.loads(self.path.read_text())
@@ -58,6 +59,14 @@ class Phase0QueueConfigTests(unittest.TestCase):
             for key, value in domain.items():
                 if key != "key":
                     self.assertFalse(Path(value).is_absolute())
+
+    def test_queue_accepts_an_explicit_tuned_config_without_changing_default(self):
+        script = self.script_path.read_text()
+
+        self.assertIn(
+            'CONFIG="${PHASE0_CONFIG:-$REPO_ROOT/configs/phase0_two_hour_qwen.json}"',
+            script,
+        )
 
 
 if __name__ == "__main__":

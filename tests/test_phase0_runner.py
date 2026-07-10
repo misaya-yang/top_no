@@ -41,7 +41,13 @@ class FakeTokenizer:
 
 
 class FakeModel:
-    def __call__(self, input_ids, attention_mask):
+    def __init__(self):
+        self.use_cache = None
+        self.inference_mode_enabled = False
+
+    def __call__(self, input_ids, attention_mask, use_cache=None):
+        self.use_cache = use_cache
+        self.inference_mode_enabled = torch.is_inference_mode_enabled()
         batch, length = input_ids.shape
         logits = torch.zeros(batch, length, 128)
         logits[..., 0] = input_ids
@@ -62,10 +68,11 @@ class Phase0RunnerTests(unittest.TestCase):
             "text-b": list(range(50, 90)),
         }
         tokenizer = FakeTokenizer(tokens)
+        model = FakeModel()
 
         rows = list(
             iter_document_logits(
-                FakeModel(),
+                model,
                 tokenizer,
                 self.documents(),
                 device=torch.device("cpu"),
@@ -80,6 +87,8 @@ class Phase0RunnerTests(unittest.TestCase):
         self.assertEqual([row.doc_id for row in rows], ["doc-a", "doc-b"])
         self.assertFalse(tokenizer.kwargs["add_special_tokens"])
         self.assertTrue(tokenizer.kwargs["truncation"])
+        self.assertIs(model.use_cache, False)
+        self.assertTrue(model.inference_mode_enabled)
         for row in rows:
             source = tokens[f"text-{row.doc_id[-1]}"]
             for index, selection in enumerate(row.selections):

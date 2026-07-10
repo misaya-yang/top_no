@@ -8,7 +8,7 @@ cd "$REPO_ROOT"
 PYTHON_BIN="${PYTHON_BIN:-python}"
 DATA_ROOT="${TOPNO_PHASE0_DATA_ROOT:-/root/autodl-tmp/top_no_phase0}"
 OUTPUT_ROOT="${PHASE0_OUTPUT_ROOT:-$REPO_ROOT/results/phase0_two_hour}"
-CONFIG="$REPO_ROOT/configs/phase0_two_hour_qwen.json"
+CONFIG="${PHASE0_CONFIG:-$REPO_ROOT/configs/phase0_two_hour_qwen.json}"
 HF_HOME="${HF_HOME:-/root/autodl-tmp/huggingface}"
 export HF_HOME
 export TRANSFORMERS_OFFLINE=1

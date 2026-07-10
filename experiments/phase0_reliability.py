@@ -132,8 +132,12 @@ def iter_document_logits(
         attention_mask = encoded["attention_mask"].to(device)
         if input_ids.dim() != 2 or attention_mask.shape != input_ids.shape:
             raise ValueError("tokenizer returned malformed batched tensors")
-        with torch.no_grad():
-            output = model(input_ids=input_ids, attention_mask=attention_mask)
+        with torch.inference_mode():
+            output = model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                use_cache=False,
+            )
         logits = output.logits
         if logits.dim() != 3 or logits.shape[:2] != input_ids.shape:
             raise ValueError("model returned malformed causal logits")
