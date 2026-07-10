@@ -30,20 +30,30 @@ the ICML 2027 decoding/calibration project.
    - Upgrades two risks to confirmed defects: eval-pool frequency-count leakage
      and sequential calibration/eval splitting.
 
+6. `2026-07-10-topno-deep-review.md`
+   - Fable5's 2026 decoding-landscape review after the Phase-0 pilot.
+   - Recommends a conformal scheduler for risk-controlled test-time compute as
+     the flagship direction, with the repaired margin/frequency audit retained
+     as the lower-risk fallback.
+
+7. `2026-07-10-final-method-paper-draft-prompt.md`
+   - Final adjudication prompt to use with the Fable5 and GPT-5.6 Pro reviews.
+   - Requires one selected method and a detailed paper-grade English draft,
+     rather than another menu of possible directions.
+
 ## Current Takeaway
 
-The project should not currently claim a universal new sampler. The stronger
-path is to test whether token frequency adds information beyond logit margin for
-calibrated support construction. If it does, the method paper is viable. If it
-does not, the fallback is a conformal audit / measurement paper.
+The frequency-offset sampler is paused after the Phase-0 result. Both current
+deep reviews recommend moving any flagship claim to a decision-relevant
+test-time-compute consumer, while retaining the confound-complete frequency
+audit only as a lower-risk empirical path. The final method has not yet been
+selected; the adjudication prompt above is intended to make that decision once.
 
 ## Immediate Implementation Focus
 
-- Implement the Phase 0 margin x frequency diagnostic.
-- First repair P0 protocol defects: external/disjoint frequency counts,
-  document-level split manifests, and a calibrated-vs-calibrated gate.
-- Add calibrated baselines: C-margin, conformal top-p / APS, RAPS, CNS, signed
-  C-nu, frequency-Mondrian margin, and learned-g.
-- Replace the current gate with calibrated-vs-calibrated Pareto and CovGap
-  criteria.
-- Keep downstream generation gated and secondary.
+- Do not restart GPU experiments or extend the old sampler pipeline before the
+  final paper method and risk contract are selected.
+- Preserve the Phase-0 evidence, protocol repairs, and audit infrastructure as
+  reusable research assets.
+- After adjudication, replace this section with one implementation and
+  experiment plan for the selected paper only.
