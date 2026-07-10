@@ -180,7 +180,12 @@ def _validate_calibration(
         raise ValueError("calibration params contain duplicate keys")
     if tuple(sorted(calibration.params)) != calibration.params:
         raise ValueError("calibration params must use canonical key order")
-    expected_params = {"alpha", "kappa"} if method_key == "c_nu" else set()
+    if method_key == "c_nu":
+        expected_params = {"alpha", "kappa"}
+    elif method_key == "raps":
+        expected_params = {"k_reg", "lambda"}
+    else:
+        expected_params = set()
     if set(params) != expected_params:
         raise ValueError("calibration params do not match method_key")
     for key, value in params.items():
@@ -190,6 +195,12 @@ def _validate_calibration(
             raise ValueError(f"calibration param {key} must be finite")
     if "alpha" in params and params["alpha"] <= 0:
         raise ValueError("calibration alpha must be positive")
+    if "lambda" in params and params["lambda"] < 0:
+        raise ValueError("calibration lambda must be non-negative")
+    if "k_reg" in params and (
+        params["k_reg"] < 1 or not float(params["k_reg"]).is_integer()
+    ):
+        raise ValueError("calibration k_reg must be a positive integer")
 
     is_mondrian = method_key in {
         "frequency_mondrian_margin",
@@ -216,9 +227,9 @@ def _validate_calibration(
         if rank_exceeds != math.isinf(float(calibration.q_hat)):
             raise ValueError("global q_hat is inconsistent with conformal rank")
 
-    if method_key == "aps":
+    if method_key in {"aps", "raps"}:
         if calibration.dither_epsilon is not None:
-            raise ValueError("APS calibration cannot contain score dither")
+            raise ValueError("APS-boundary calibration cannot contain score dither")
     elif (
         isinstance(calibration.dither_epsilon, bool)
         or not isinstance(calibration.dither_epsilon, (int, float))

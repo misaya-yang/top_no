@@ -13,9 +13,10 @@ binds those artifacts to exact text and a prefix-only `[G]` forward helper.
 PR-1d adds a recomputed, threshold-complete cross-corpus disjointness proof.
 The normal `experiments/eval_prediction_sets.py` path remains blocked because:
 
-1. four mandatory registry methods, tuning artifacts, evaluator emission, and
+1. three mandatory registry methods, tuning artifacts, evaluator emission, and
    suffstats replay are still missing;
-2. the current gate compares one calibrated method against mostly uncalibrated
+2. a frozen deterministic CUDA runtime receipt is not yet bound to evidence;
+3. the current gate compares one calibrated method against mostly uncalibrated
    baselines.
 
 The runner refuses nonlegacy execution with
@@ -110,8 +111,8 @@ corpus/table is still required before any paper-grade runner can execute.
 
 Status: PR-2a conformal-core implementation is complete. The first PR-2b
 registry slice supplies stable identities plus tensor-only execution for
-C-margin, C-logprob, C-zmargin, APS, signed C-nu, frequency-Mondrian margin, and
-entropy-Mondrian margin. Remaining mandatory methods, runner integration,
+C-margin, C-logprob, C-zmargin, APS, RAPS, signed C-nu, frequency-Mondrian
+margin, and entropy-Mondrian margin. Remaining mandatory methods, runner integration,
 tuning artifacts, per-document evidence emission, and suffstats remain blocked.
 
 PR-2c now defines a strict, content-addressed per-position gate-evidence
@@ -128,6 +129,21 @@ unseen-token choices are now pre-registered in
 `configs/frequency_bucket_policy_v1.json`. The builder remains pending and must
 bind exact `D_tune` rows plus the pinned frequency artifact; diagnostic bands
 must not be substituted into Mondrian calibration or CovGap.
+
+PR-2g implements RAPS as APS plus
+`lambda * max(rank_1based - k_reg, 0)`. Logit ties use the same token-ID-stable
+total order as APS, low-precision rank penalties are accumulated in fp32, and
+RAPS uses APS boundary uniforms without a second score dither. Both parameters
+are canonical calibration identity and require a `D_tune` artifact in gate
+evidence. The exact remaining mandatory keys are `cns`, `learned_h`, and
+`ts_aps`.
+
+The RTX 5090 review also found that default CUDA cumulative scans can vary by
+one ULP across repeated APS calls. The future paper runner must configure
+deterministic algorithms, seeds, cuBLAS workspace, and cuDNN benchmarking once
+before model initialization; verify the effective state; and bind a runtime
+receipt into gate provenance. Tensor helpers must not hide a process-global
+state change.
 
 - `mondrian_quantiles` and score dithering are complete; add a tuning path that
   reads `D_tune` only.

@@ -53,6 +53,8 @@ class GateEvidenceTests(unittest.TestCase):
                 "token_freq_table": torch.tensor([0, 10, 100]),
                 "params": {"kappa": -1.0, "alpha": 1.0},
             }
+        elif method_key == "raps":
+            kwargs = {"params": {"lambda": 0.05, "k_reg": 2}}
         elif method_key == "frequency_mondrian_margin":
             token_groups = torch.tensor([0, 1, 1])
             kwargs = {
@@ -106,6 +108,7 @@ class GateEvidenceTests(unittest.TestCase):
         calibration = self.calibration(method_key)
         provenance = self.provenance()
         if method_key in {
+            "raps",
             "c_nu",
             "frequency_mondrian_margin",
             "entropy_mondrian_margin",
@@ -253,6 +256,47 @@ class GateEvidenceTests(unittest.TestCase):
             )
         with self.assertRaisesRegex(ValueError, "calibration method_key"):
             validate_gate_evidence(replace(evidence, method_key="c_margin"))
+
+    def test_raps_params_and_aps_boundary_randomization_are_audited(self):
+        evidence = self.evidence("raps")
+        validate_gate_evidence(evidence)
+
+        with self.assertRaisesRegex(ValueError, "tuning_artifact_id"):
+            validate_gate_evidence(
+                replace(
+                    evidence,
+                    provenance=replace(
+                        evidence.provenance, tuning_artifact_id=None
+                    ),
+                )
+            )
+        with self.assertRaisesRegex(ValueError, "k_reg"):
+            validate_gate_evidence(
+                replace(
+                    evidence,
+                    calibration=replace(
+                        evidence.calibration,
+                        params=(("k_reg", 1.5), ("lambda", 0.05)),
+                    ),
+                )
+            )
+        with self.assertRaisesRegex(ValueError, "lambda"):
+            validate_gate_evidence(
+                replace(
+                    evidence,
+                    calibration=replace(
+                        evidence.calibration,
+                        params=(("k_reg", 2.0), ("lambda", -0.05)),
+                    ),
+                )
+            )
+        with self.assertRaisesRegex(ValueError, "score dither"):
+            validate_gate_evidence(
+                replace(
+                    evidence,
+                    calibration=replace(evidence.calibration, dither_epsilon=1e-6),
+                )
+            )
 
     def test_calibration_thresholds_must_match_finite_sample_rank(self):
         evidence = self.evidence()

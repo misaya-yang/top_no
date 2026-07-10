@@ -373,6 +373,8 @@ def aps_scores(
 
     For token i, A(i)=sum_{j before i} p_j + u_i p_i. With all u_i=0,
     ``A(i) <= q`` is deterministic nucleus sampling with the crossing token.
+    Non-fp64 inputs are scored in fp32 so large-vocabulary cumulative mass and
+    boundary uniforms are not quantized away.
     """
     _validate_logits(logits)
     _validate_order(logits, order)
@@ -384,8 +386,9 @@ def aps_scores(
         raise ValueError("uniforms must be finite values in [0, 1)")
 
     order = order.to(device=logits.device)
-    uniforms = uniforms.to(device=logits.device, dtype=logits.dtype)
-    probabilities = torch.softmax(logits, dim=-1)
+    working_logits = logits if logits.dtype == torch.float64 else logits.float()
+    uniforms = uniforms.to(device=logits.device, dtype=working_logits.dtype)
+    probabilities = torch.softmax(working_logits, dim=-1)
     sorted_probabilities = probabilities.gather(-1, order)
     cumulative_mass = sorted_probabilities.cumsum(dim=-1)
     prefix_mass = torch.zeros_like(cumulative_mass)
@@ -411,6 +414,71 @@ def aps_nonconformity(
         logits,
         order=order,
         uniforms=uniforms,
+    ).gather(-1, target_ids.unsqueeze(-1)).squeeze(-1)
+
+
+def _validate_raps_params(lambda_reg: float, k_reg: int) -> tuple[float, int]:
+    if (
+        isinstance(lambda_reg, bool)
+        or not isinstance(lambda_reg, (int, float))
+        or not math.isfinite(float(lambda_reg))
+        or float(lambda_reg) < 0.0
+    ):
+        raise ValueError("lambda_reg must be a finite non-negative number")
+    if isinstance(k_reg, bool) or not isinstance(k_reg, int) or k_reg < 1:
+        raise ValueError("k_reg must be a positive integer")
+    return float(lambda_reg), k_reg
+
+
+def raps_scores(
+    logits: torch.Tensor,
+    *,
+    order: torch.Tensor,
+    uniforms: torch.Tensor,
+    lambda_reg: float,
+    k_reg: int,
+) -> torch.Tensor:
+    """Return RAPS scores with a one-based stable-rank penalty.
+
+    ``A_RAPS(i) = A_APS(i) + lambda_reg * max(rank(i) - k_reg, 0)``.
+    Rank one is the highest-logit candidate under the caller's explicit total
+    order. Low-precision APS and rank arithmetic stay in fp32 so
+    large-vocabulary cumulative mass and penalties remain distinguishable.
+    """
+    lambda_reg, k_reg = _validate_raps_params(lambda_reg, k_reg)
+    aps = aps_scores(logits, order=order, uniforms=uniforms)
+    working_dtype = torch.float64 if aps.dtype == torch.float64 else torch.float32
+    scores = aps.to(dtype=working_dtype)
+    device_order = order.to(device=logits.device)
+    sorted_ranks = torch.arange(
+        1,
+        logits.shape[1] + 1,
+        device=logits.device,
+        dtype=working_dtype,
+    ).unsqueeze(0).expand_as(scores)
+    ranks = torch.empty_like(scores)
+    ranks.scatter_(-1, device_order, sorted_ranks)
+    return scores + lambda_reg * torch.clamp(ranks - k_reg, min=0.0)
+
+
+def raps_nonconformity(
+    logits: torch.Tensor,
+    target_ids: torch.Tensor,
+    *,
+    order: torch.Tensor,
+    uniforms: torch.Tensor,
+    lambda_reg: float,
+    k_reg: int,
+) -> torch.Tensor:
+    """Return the RAPS score of each observed target token."""
+    _validate_logits(logits)
+    _validate_target_ids(logits, target_ids)
+    return raps_scores(
+        logits,
+        order=order,
+        uniforms=uniforms,
+        lambda_reg=lambda_reg,
+        k_reg=k_reg,
     ).gather(-1, target_ids.unsqueeze(-1)).squeeze(-1)
 
 

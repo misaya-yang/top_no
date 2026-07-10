@@ -53,6 +53,7 @@ class MethodRegistryTests(unittest.TestCase):
                 "c_logprob",
                 "c_zmargin",
                 "aps",
+                "raps",
                 "c_nu",
                 "entropy_mondrian_margin",
                 "frequency_mondrian_margin",
@@ -68,14 +69,69 @@ class MethodRegistryTests(unittest.TestCase):
     def test_lookup_rejects_unknown_and_calibration_rejects_unimplemented_method(self):
         with self.assertRaisesRegex(ValueError, "unknown method key"):
             get_method_definition("conformal_nu_k10")
-        with self.assertRaisesRegex(NotImplementedError, "raps"):
+        with self.assertRaisesRegex(NotImplementedError, "ts_aps"):
             calibrate_method(
-                "raps",
+                "ts_aps",
                 torch.zeros((1, 2)),
                 torch.zeros(1, dtype=torch.long),
                 delta=0.1,
                 uniforms=torch.zeros((1, 2)),
             )
+
+    def test_raps_lambda_zero_matches_aps_end_to_end(self):
+        self.assertIn("raps", implemented_method_keys())
+        torch.manual_seed(43)
+        logits = torch.randn(19, 23, dtype=torch.float64)
+        targets = torch.arange(19) % logits.shape[1]
+        uniforms = torch.rand_like(logits)
+        aps = calibrate_method(
+            "aps",
+            logits,
+            targets,
+            delta=0.1,
+            uniforms=uniforms,
+        )
+        raps = calibrate_method(
+            "raps",
+            logits,
+            targets,
+            delta=0.1,
+            uniforms=uniforms,
+            params={"lambda": 0.0, "k_reg": 5},
+        )
+
+        self.assertEqual(raps.params, (("k_reg", 5.0), ("lambda", 0.0)))
+        self.assertIsNone(raps.dither_epsilon)
+        self.assertEqual(raps.q_hat, aps.q_hat)
+        self.assertTrue(
+            torch.equal(
+                prediction_set_mask(raps, logits, uniforms=uniforms),
+                prediction_set_mask(aps, logits, uniforms=uniforms),
+            )
+        )
+
+    def test_raps_requires_canonical_regularization_params(self):
+        self.assertIn("raps", implemented_method_keys())
+        logits = torch.zeros((3, 5), dtype=torch.float64)
+        targets = torch.zeros(3, dtype=torch.long)
+        uniforms = torch.zeros_like(logits)
+        invalid = (
+            None,
+            {"lambda": 0.1},
+            {"lambda": -0.1, "k_reg": 1},
+            {"lambda": 0.1, "k_reg": 1.5},
+            {"lambda": 0.1, "k_reg": True},
+        )
+        for params in invalid:
+            with self.subTest(params=params), self.assertRaises(ValueError):
+                calibrate_method(
+                    "raps",
+                    logits,
+                    targets,
+                    delta=0.5,
+                    uniforms=uniforms,
+                    params=params,
+                )
 
     def test_c_margin_calibrates_and_matches_min_p_with_zero_dither(self):
         calibration_logits = torch.tensor(

@@ -27,6 +27,8 @@ from conformal import (
     margin_scores,
     mondrian_quantiles,
     nu_nonconformity,
+    raps_nonconformity,
+    raps_scores,
     zmargin_nonconformity,
     zmargin_scores,
 )
@@ -81,7 +83,7 @@ _REGISTRY = (
         "none",
         "baseline",
         "aps_boundary",
-        False,
+        True,
     ),
     MethodDefinition(
         "ts_aps",
@@ -192,7 +194,12 @@ def _normalize_params(
     params: Mapping[str, float] | None,
 ) -> tuple[tuple[str, float], ...]:
     supplied = {} if params is None else dict(params)
-    required = {"kappa", "alpha"} if method_key == "c_nu" else set()
+    if method_key == "c_nu":
+        required = {"kappa", "alpha"}
+    elif method_key == "raps":
+        required = {"lambda", "k_reg"}
+    else:
+        required = set()
     if set(supplied) != required:
         raise ValueError(
             f"{method_key} params must contain exactly {sorted(required)!r}"
@@ -200,6 +207,11 @@ def _normalize_params(
     normalized = []
     for key in sorted(supplied):
         value = supplied[key]
+        if key == "k_reg":
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                raise ValueError("raps param k_reg must be a positive integer")
+            normalized.append((key, float(value)))
+            continue
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             raise ValueError(f"{method_key} param {key} must be numeric")
         value = float(value)
@@ -207,6 +219,8 @@ def _normalize_params(
             raise ValueError(f"{method_key} param {key} must be finite")
         if key == "alpha" and value <= 0.0:
             raise ValueError("c_nu param alpha must be positive")
+        if key == "lambda" and value < 0.0:
+            raise ValueError("raps param lambda must be non-negative")
         normalized.append((key, value))
     return tuple(normalized)
 
@@ -248,6 +262,15 @@ def _target_scores(
             target_ids,
             order=descending_order(logits),
             uniforms=uniforms,
+        )
+    if method_key == "raps":
+        return raps_nonconformity(
+            logits,
+            target_ids,
+            order=descending_order(logits),
+            uniforms=uniforms,
+            lambda_reg=params["lambda"],
+            k_reg=int(params["k_reg"]),
         )
     if method_key == "c_nu":
         if token_freq_table is None:
@@ -336,7 +359,9 @@ def calibrate_method(
         group_quantiles=group_quantiles,
         params=normalized_params,
         group_axis=group_axis,
-        dither_epsilon=None if method_key == "aps" else float(dither_epsilon),
+        dither_epsilon=(
+            None if method_key in {"aps", "raps"} else float(dither_epsilon)
+        ),
         min_bucket=effective_min_bucket,
     )
 
@@ -353,6 +378,15 @@ def _candidate_scores(
             logits,
             order=descending_order(logits),
             uniforms=uniforms,
+        )
+    if calibration.method_key == "raps":
+        params = _params_dict(calibration)
+        return raps_scores(
+            logits,
+            order=descending_order(logits),
+            uniforms=uniforms,
+            lambda_reg=params["lambda"],
+            k_reg=int(params["k_reg"]),
         )
     if calibration.method_key == "c_nu":
         if token_freq_table is None:
@@ -371,7 +405,7 @@ def _candidate_scores(
     else:
         scores = margin_scores(logits)
     if calibration.dither_epsilon is None:
-        raise ValueError("non-APS calibration is missing dither_epsilon")
+        raise ValueError("score-dither calibration is missing dither_epsilon")
     return dither_scores(scores, uniforms, epsilon=calibration.dither_epsilon)
 
 

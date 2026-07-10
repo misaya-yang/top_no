@@ -2,7 +2,8 @@
 
 ## Executive state
 
-Current `main`: `c89884f8ae04817539116d48ae625b6ea8bec90f`.
+Repository base at the start of the PR-2g round:
+`d343e431ae76991190220323fda7fe8204491a72`.
 
 The repository now has an audited, fail-closed foundation for the active paper
 framing, **Frequency-Offset Margin Rules for Calibrated Language Model
@@ -57,6 +58,11 @@ and any replicated efficiency or conditional-coverage finding.
    - stable C-logprob with chunked target-only log-normalizer;
    - stable C-zmargin with shared chunked sample-std statistics;
    - exact epsilon-set and top-nsigma equivalences at zero dither.
+8. **Theory obligations + PR-2g RAPS** (`d343e43`, current round)
+   - formal candidate-token probability space and feature-class boundaries;
+   - RAPS with explicit 1-based stable rank and APS boundary randomization;
+   - fp32 rank penalties for low-precision large-vocabulary logits;
+   - canonical tune-only `lambda`/`k_reg` identity in gate evidence.
 
 Every major round received an independent Critical/Important review. Review
 counterexamples were converted into regression tests before merge.
@@ -68,21 +74,22 @@ Local main:
 ```text
 python3 -m compileall experiments                         PASS
 for script in scripts/*.sh; do bash -n "$script"; done   PASS
-python3 -m unittest discover tests                        183/183 PASS
+python3 -m unittest discover tests                        192/192 PASS
 git diff --check                                          PASS
 ```
 
 RTX 5090 server:
 
 ```text
-python -m unittest discover tests                         183 run, 182 PASS,
+python -m unittest discover tests                         192 run, 191 PASS,
                                                          1 MPS-only skip
 ```
 
 Real-width CUDA probes used `V=152064` and checked all implemented registry
 paths. C-logprob preserved `log(V)` for a constant fp16 row at offset 60,000.
 C-zmargin target/full scores were bitwise identical across the full vocabulary.
-These are numerical/shape tests, not scientific results.
+APS/RAPS preserve all 152,064 cumulative-mass values and boundary uniforms in
+fp32/fp64. These are numerical/shape tests, not scientific results.
 
 ## Server and model state
 
@@ -106,7 +113,7 @@ large-support behavior is useful only as a failure-mode diagnostic.
 Paper-grade prediction-set execution must stay blocked until all of the
 following are complete:
 
-1. Mandatory registry methods: `raps`, `ts_aps`, `cns`, and `learned_h`.
+1. Mandatory registry methods: `ts_aps`, `cns`, and `learned_h`.
 2. A method-bucket builder that binds exact `D_tune` target rows, the pinned
    `D_freq` frequency artifact, and the committed policy hash.
 3. A sharded suffstats writer/replayer with direct/replay agreement tests.
@@ -115,21 +122,23 @@ following are complete:
 5. Per-method tuning artifacts built from `D_tune` only.
 6. PR-3 paired document-cluster bootstrap, frozen gate thresholds, mandatory
    comparator completeness, and `PASS / G2-only / FAIL / INELIGIBLE` handling.
-7. A production `D_freq` corpus/table. The two-document frequency artifact is
+7. A frozen deterministic CUDA runtime receipt, bound into evidence before
+   any model initialization or citable forward pass.
+8. A production `D_freq` corpus/table. The two-document frequency artifact is
    only a functional smoke; Fable5's target is corpus scale.
 
 ## Strict next sequence
 
 1. Implement the bound method-bucket builder and artifact tests.
 2. Implement suffstats schema/writer/replay before another large model pass.
-3. Add RAPS, tune-only temperature scaling plus APS, CNS, and learned-h.
-4. Wire the `[G]` calibration/test forwards to emit gate evidence v2.
-5. Implement and freeze PR-3; keep downstream generation locked.
-6. Build a production frequency table and run Phase 0 first.
-7. Only if Phase 0 is stable across tune halves, run the calibrated Pareto
+3. Add tune-only temperature scaling plus APS, CNS, and learned-h.
+4. Add and bind the deterministic CUDA runtime receipt.
+5. Wire the `[G]` calibration/test forwards to emit gate evidence v2.
+6. Implement and freeze PR-3; keep downstream generation locked.
+7. Build a production frequency table and run Phase 0 first.
+8. Only if Phase 0 is stable across tune halves, run the calibrated Pareto
    matrix. Only if G1 or G2 passes, spend GPU budget on downstream generation.
 
 This ordering protects both possible papers: a frequency-method paper if the
 effect is real and exploitable, or a broad conformal audit if margin is already
 nearly sufficient.
-

@@ -295,7 +295,7 @@ class PredictionProtocolTests(unittest.TestCase):
     def test_complete_inputs_advance_to_pr2_pr3_block(self):
         with self.assertRaisesRegex(
             RuntimeError,
-            "blocked_pending_pr2_pr3.*missing_paper_methods=.*cns.*raps",
+            "blocked_pending_pr2_pr3.*missing_paper_methods=cns,learned_h,ts_aps",
         ):
             validate_protocol_inputs(self.complete_config())
 
