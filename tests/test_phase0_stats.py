@@ -8,6 +8,7 @@ sys.path.insert(0, str(ROOT / "experiments"))
 
 import numpy as np  # noqa: E402
 import torch  # noqa: E402
+import phase0_stats  # noqa: E402
 
 from phase0_stats import (  # noqa: E402
     DocumentGridStats,
@@ -48,6 +49,34 @@ class Phase0StatsTests(unittest.TestCase):
         self.assertEqual(result.n_positions, 1)
         self.assertEqual(result.num.dtype, torch.int64)
         self.assertEqual(result.den.dtype, torch.int64)
+
+    def test_precomputed_frequency_groups_preserve_exact_statistics(self):
+        prepare = getattr(phase0_stats, "prepare_frequency_groups", None)
+        self.assertIsNotNone(prepare)
+        token_counts = torch.tensor([0, 9, 10, 10_000_000], dtype=torch.int64)
+        kwargs = {
+            "grid": GridSpec.default(),
+            "excluded_token_ids": {3},
+            "permutation_seed": 17,
+        }
+        direct = accumulate_document(
+            "doc-a",
+            torch.tensor([[4.0, 3.0, 1.0, 0.0]]),
+            torch.tensor([1]),
+            token_counts,
+            **kwargs,
+        )
+        prepared = accumulate_document(
+            "doc-a",
+            torch.tensor([[4.0, 3.0, 1.0, 0.0]]),
+            torch.tensor([1]),
+            token_counts,
+            prepared_frequency_groups=prepare(token_counts, seed=17),
+            **kwargs,
+        )
+
+        for field in ("num", "den", "perm_num", "perm_den"):
+            self.assertTrue(torch.equal(getattr(direct, field), getattr(prepared, field)))
 
     def test_excluded_true_target_removes_entire_position(self):
         result = accumulate_document(

@@ -35,6 +35,7 @@ from phase0_stats import (
     accumulate_document,
     analyze_grid,
     merge_document_stats,
+    prepare_frequency_groups,
 )
 from protocol import validate_phase0_inputs
 from splits import ManifestDocument, SelectedPosition, pooled_positions
@@ -189,6 +190,10 @@ def consume_document_rows(
     elapsed = 0.0
     stats = []
     status = "COMPLETE"
+    prepared_groups = prepare_frequency_groups(
+        token_counts,
+        seed=permutation_seed,
+    )
     for row in rows:
         elapsed = clock() - started
         if elapsed >= wall_seconds:
@@ -203,6 +208,7 @@ def consume_document_rows(
                 grid=grid,
                 excluded_token_ids=excluded_token_ids,
                 permutation_seed=permutation_seed,
+                prepared_frequency_groups=prepared_groups,
             )
         )
     return ConsumeResult(status, tuple(stats), elapsed)
@@ -494,6 +500,10 @@ def run_cell(
         excluded_target_ids=preflight.exclusion_token_ids,
     )
     positions = sum(item.n_positions for item in stats)
+    prepared_groups = prepare_frequency_groups(
+        preflight.token_counts,
+        seed=int(preflight.cell["seed"]),
+    )
     completed_since_checkpoint = 0
 
     def write_checkpoint() -> None:
@@ -524,6 +534,7 @@ def run_cell(
             grid=grid,
             excluded_token_ids=preflight.exclusion_token_ids,
             permutation_seed=int(preflight.cell["seed"]),
+            prepared_frequency_groups=prepared_groups,
         )
         stats.append(item)
         positions += item.n_positions

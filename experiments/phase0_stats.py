@@ -87,6 +87,14 @@ class DocumentGridStats:
     n_positions: int
 
 
+@dataclass(frozen=True)
+class PreparedFrequencyGroups:
+    groups: torch.Tensor
+    permuted_groups: torch.Tensor
+    seed: int
+    source_data_ptr: int
+
+
 def _validate_seed(seed: object) -> int:
     if isinstance(seed, bool) or not isinstance(seed, int) or not 0 <= seed < 2**32:
         raise ValueError("seed must be an integer in [0, 2**32)")
@@ -116,6 +124,21 @@ def permuted_frequency_groups(groups: torch.Tensor, *, seed: int) -> torch.Tenso
     cpu_groups = groups.detach().to(device="cpu", dtype=torch.long)
     order = torch.randperm(cpu_groups.numel(), generator=generator)
     return cpu_groups[order]
+
+
+def prepare_frequency_groups(
+    token_counts: torch.Tensor,
+    *,
+    seed: int,
+) -> PreparedFrequencyGroups:
+    groups = diagnostic_frequency_groups(token_counts)
+    seed = _validate_seed(seed)
+    return PreparedFrequencyGroups(
+        groups=groups,
+        permuted_groups=permuted_frequency_groups(groups, seed=seed),
+        seed=seed,
+        source_data_ptr=token_counts.data_ptr(),
+    )
 
 
 def _normalized_exclusions(values: Collection[int], vocab_size: int) -> tuple[int, ...]:
@@ -152,6 +175,7 @@ def accumulate_document(
     grid: GridSpec,
     excluded_token_ids: Collection[int],
     permutation_seed: int,
+    prepared_frequency_groups: PreparedFrequencyGroups | None = None,
 ) -> DocumentGridStats:
     """Accumulate real and frequency-permuted grids for one document."""
     if not isinstance(grid, GridSpec):
@@ -176,7 +200,19 @@ def accumulate_document(
     vocab_size = logits.shape[1]
     if ((targets < 0) | (targets >= vocab_size)).any():
         raise ValueError("targets contains an out-of-range token ID")
-    groups_cpu = diagnostic_frequency_groups(token_counts)
+    if prepared_frequency_groups is None:
+        prepared_frequency_groups = prepare_frequency_groups(
+            token_counts,
+            seed=permutation_seed,
+        )
+    if not isinstance(prepared_frequency_groups, PreparedFrequencyGroups):
+        raise ValueError("prepared_frequency_groups has an invalid type")
+    if (
+        prepared_frequency_groups.seed != permutation_seed
+        or prepared_frequency_groups.source_data_ptr != token_counts.data_ptr()
+    ):
+        raise ValueError("prepared_frequency_groups does not match token counts and seed")
+    groups_cpu = prepared_frequency_groups.groups
     if groups_cpu.numel() != vocab_size:
         raise ValueError("token_counts must match logits vocabulary")
     exclusions = _normalized_exclusions(excluded_token_ids, vocab_size)
@@ -199,10 +235,7 @@ def accumulate_document(
     margin_bins = grid.margin_bin_indices(margins)
     allowed = allowed_cpu.to(device=logits.device)
     real_groups = groups_cpu.to(device=logits.device, dtype=torch.long)
-    perm_groups = permuted_frequency_groups(
-        groups_cpu,
-        seed=permutation_seed,
-    ).to(device=logits.device)
+    perm_groups = prepared_frequency_groups.permuted_groups.to(device=logits.device)
 
     def count_den(groups: torch.Tensor) -> torch.Tensor:
         flat = (
